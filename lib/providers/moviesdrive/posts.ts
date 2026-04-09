@@ -1,4 +1,4 @@
-import { Post } from "@/lib/types/provider";
+import { Post } from "../../types/provider";
 
 export const getPosts = async (): Promise<Post[]> => {
   return [
