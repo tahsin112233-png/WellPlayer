@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProvider } from "@/lib/providerEngine";
+import { getProvider } from "../../../lib/providerEngine";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
