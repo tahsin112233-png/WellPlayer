@@ -1,42 +1,105 @@
 import axios from "axios";
-import { Stream } from "../../types/provider";
+import * as cheerio from "cheerio";
 
-export const getStream = async (url: string): Promise<Stream[]> => {
+// 🔥 resolve redirect (short.icu etc)
+async function resolveRedirect(url: string): Promise<string> {
   try {
-    const { data } = await axios.get(url, {
+    const res = await axios.get(url, {
+      maxRedirects: 5,
       headers: {
         "User-Agent": "Mozilla/5.0",
       },
     });
 
-    const m3u8Matches = data.match(/https?:\/\/[^"]+\.m3u8/g) || [];
-    const mp4Matches = data.match(/https?:\/\/[^"]+\.mp4/g) || [];
-
-    // 🔥 Prefer m3u8
-    if (m3u8Matches.length > 0) {
-      const unique = Array.from(new Set(m3u8Matches));
-
-      return unique.map((link: string) => ({
-        server: "MyFlixBD",
-        link,
-        type: "m3u8",
-      }));
-    }
-
-    // 🔥 fallback to mp4
-    if (mp4Matches.length > 0) {
-      const unique = Array.from(new Set(mp4Matches));
-
-      return unique.map((link: string) => ({
-        server: "MyFlixBD",
-        link,
-        type: "mp4",
-      }));
-    }
-
-    return [];
-  } catch (err) {
-    console.error("STREAM ERROR:", err);
-    return [];
+    return res.request?.res?.responseUrl || url;
+  } catch {
+    return url;
   }
-};
+}
+
+// 🔥 extract m3u8 / mp4
+function extractVideo(html: string): string | null {
+  const m3u8 = html.match(/https?:\/\/[^"' ]+\.m3u8[^"' ]*/);
+  if (m3u8) return m3u8[0];
+
+  const mp4 = html.match(/https?:\/\/[^"' ]+\.mp4[^"' ]*/);
+  if (mp4) return mp4[0];
+
+  return null;
+}
+
+// 🔥 MAIN FUNCTION
+export async function getStream(url: string) {
+  try {
+    // STEP 1: load MyFlixBD page
+    const res = await axios.get(url);
+    const html = res.data;
+
+    const $ = cheerio.load(html);
+
+    // STEP 2: get iframe
+    let iframe =
+      $("iframe").attr("data-src") ||
+      $("iframe").attr("src") ||
+      $(".btn-server").attr("data-url");
+
+    if (!iframe) {
+      return {
+        success: false,
+      };
+    }
+
+    // STEP 3: resolve short link
+    const finalUrl = await resolveRedirect(iframe);
+
+    // STEP 4: fetch player page
+    const playerRes = await axios.get(finalUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": url,
+      },
+    });
+
+    const playerHtml = playerRes.data;
+
+    // STEP 5: try direct video extraction
+    const video = extractVideo(playerHtml);
+
+    if (video) {
+      return {
+        success: true,
+        source: {
+          type: "file",
+          url: video,
+        },
+      };
+    }
+
+    // STEP 6: fallback → iframe inside iframe
+    const $$ = cheerio.load(playerHtml);
+    const nestedIframe = $$("iframe").attr("src");
+
+    if (nestedIframe) {
+      return {
+        success: true,
+        source: {
+          type: "iframe",
+          url: nestedIframe,
+        },
+      };
+    }
+
+    // fallback
+    return {
+      success: true,
+      source: {
+        type: "iframe",
+        url: finalUrl,
+      },
+    };
+  } catch (err) {
+    return {
+      success: false,
+    };
+  }
+}
