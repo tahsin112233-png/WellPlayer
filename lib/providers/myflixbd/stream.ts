@@ -9,28 +9,30 @@ export const getStream = async (url: string): Promise<Stream[]> => {
       },
     });
 
-    // Extract links
     const m3u8Matches = data.match(/https?:\/\/[^"]+\.m3u8/g) || [];
     const mp4Matches = data.match(/https?:\/\/[^"]+\.mp4/g) || [];
 
-    const allLinks = [...m3u8Matches, ...mp4Matches];
+    // 🔥 Prefer m3u8 (real streams)
+    if (m3u8Matches.length > 0) {
+      const unique = Array.from(new Set(m3u8Matches));
+      return unique.map((link) => ({
+        server: "MyFlixBD",
+        link,
+        type: "m3u8",
+      }));
+    }
 
-    // ❌ FILTER OUT junk/tutorial videos
-    const filtered = allLinks.filter((link) => {
-      return (
-        !link.includes("wp-content") && // remove tutorial vids
-        !link.includes("logo") &&
-        !link.includes("intro")
-      );
-    });
+    // 🔥 fallback to mp4 (even if tutorial)
+    if (mp4Matches.length > 0) {
+      const unique = Array.from(new Set(mp4Matches));
+      return unique.map((link) => ({
+        server: "MyFlixBD",
+        link,
+        type: "mp4",
+      }));
+    }
 
-    const uniqueLinks = Array.from(new Set(filtered));
-
-    return uniqueLinks.map((link) => ({
-      server: "MyFlixBD",
-      link,
-      type: link.includes(".m3u8") ? "m3u8" : "mp4",
-    }));
+    return [];
   } catch (err) {
     console.error("STREAM ERROR:", err);
     return [];
