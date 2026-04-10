@@ -9,18 +9,23 @@ export const getStream = async (url: string): Promise<Stream[]> => {
       },
     });
 
-    const streams: Stream[] = [];
-
-    // 🔥 Extract all possible video links
+    // Extract links
     const m3u8Matches = data.match(/https?:\/\/[^"]+\.m3u8/g) || [];
     const mp4Matches = data.match(/https?:\/\/[^"]+\.mp4/g) || [];
 
     const allLinks = [...m3u8Matches, ...mp4Matches];
 
-    // 🔥 Remove duplicates
-    const uniqueLinks = Array.from(new Set(allLinks));
+    // ❌ FILTER OUT junk/tutorial videos
+    const filtered = allLinks.filter((link) => {
+      return (
+        !link.includes("wp-content") && // remove tutorial vids
+        !link.includes("logo") &&
+        !link.includes("intro")
+      );
+    });
 
-    // 🔥 Format response
+    const uniqueLinks = Array.from(new Set(filtered));
+
     return uniqueLinks.map((link) => ({
       server: "MyFlixBD",
       link,
