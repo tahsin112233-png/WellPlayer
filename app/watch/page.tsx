@@ -20,27 +20,31 @@ export default function WatchPage() {
   const target =
     "https://myflixbd.to/movie/avatar-fire-and-ash/";
 
-  // 🔥 Fetch sources
+  // 🔥 FETCH SOURCES
   useEffect(() => {
     async function load() {
-      const res = await fetch(
-        `/api/stream?url=${encodeURIComponent(target)}`
-      );
-      const data = await res.json();
+      try {
+        const res = await fetch(
+          `/api/stream?url=${encodeURIComponent(target)}`
+        );
+        const data = await res.json();
 
-      if (data.success) {
-        setSources(data.sources);
+        if (data.success && data.sources.length > 0) {
+          setSources(data.sources);
 
-        const best =
-          data.sources.find((s: Source) =>
-            s.url.includes(".m3u8")
-          ) ||
-          data.sources.find((s: Source) =>
-            s.url.includes(".mp4")
-          ) ||
-          data.sources[0];
+          const best =
+            data.sources.find((s: Source) =>
+              s.url.includes(".m3u8")
+            ) ||
+            data.sources.find((s: Source) =>
+              s.url.includes(".mp4")
+            ) ||
+            data.sources[0];
 
-        setCurrent(best);
+          setCurrent(best);
+        }
+      } catch (e) {
+        console.error("Fetch error", e);
       }
 
       setLoading(false);
@@ -49,11 +53,14 @@ export default function WatchPage() {
     load();
   }, []);
 
-  // 🔥 Setup video
+  // 🔥 SET VIDEO SOURCE
   useEffect(() => {
     if (!current || !videoRef.current) return;
 
     const video = videoRef.current;
+
+    video.pause();
+    video.removeAttribute("src");
 
     if (current.url.includes(".m3u8")) {
       if (Hls.isSupported()) {
@@ -66,8 +73,12 @@ export default function WatchPage() {
     } else {
       video.src = current.url;
     }
+
+    video.load();
+    setPlaying(false);
   }, [current]);
 
+  // 🔥 PLAY / PAUSE
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -97,16 +108,39 @@ export default function WatchPage() {
         {loading ? (
           <p style={{ color: "white" }}>Loading...</p>
         ) : current?.type === "iframe" ? (
-          <iframe src={current.url} width="100%" height="400" />
+          <iframe
+            src={current.url}
+            width="100%"
+            height="400"
+            allowFullScreen
+          />
         ) : (
           <>
+            {/* VIDEO */}
             <video
               ref={videoRef}
               playsInline
-              style={{ width: "100%" }}
+              autoPlay
+              controls={false}
+              style={{
+                width: "100%",
+                background: "black",
+              }}
             />
 
-            {/* 🔥 CENTER PLAY BUTTON */}
+            {/* 🚫 FORCE HIDE NATIVE CONTROLS */}
+            <style>
+              {`
+                video::-webkit-media-controls {
+                  display: none !important;
+                }
+                video::-webkit-media-controls-enclosure {
+                  display: none !important;
+                }
+              `}
+            </style>
+
+            {/* ▶ CENTER BUTTON */}
             <div
               onClick={togglePlay}
               style={{
@@ -117,12 +151,13 @@ export default function WatchPage() {
                 fontSize: 60,
                 color: "white",
                 cursor: "pointer",
+                zIndex: 10,
               }}
             >
               {playing ? "⏸" : "▶"}
             </div>
 
-            {/* 🔥 TOP GRADIENT */}
+            {/* 🔝 TOP GRADIENT */}
             <div
               style={{
                 position: "absolute",
@@ -134,7 +169,7 @@ export default function WatchPage() {
               }}
             />
 
-            {/* 🔥 BOTTOM CONTROLS */}
+            {/* 🔻 BOTTOM BAR */}
             <div
               style={{
                 position: "absolute",
@@ -166,7 +201,7 @@ export default function WatchPage() {
         )}
       </div>
 
-      {/* SERVERS */}
+      {/* 🔥 SERVERS */}
       <div style={{ marginTop: 20 }}>
         {sources.map((s, i) => (
           <button
@@ -175,7 +210,7 @@ export default function WatchPage() {
             style={{
               marginRight: 10,
               padding: "10px 15px",
-              background: "red",
+              background: current === s ? "#ff4444" : "#222",
               color: "white",
               border: "none",
               borderRadius: 6,
