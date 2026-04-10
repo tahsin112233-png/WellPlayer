@@ -1,3 +1,5 @@
+// lib/types.ts
+
 export type Source = {
   type: "file" | "iframe";
   url: string;
