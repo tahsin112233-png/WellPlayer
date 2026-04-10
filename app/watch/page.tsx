@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Hls from "hls.js";
-import Plyr from "plyr-react";
+import dynamic from "next/dynamic";
+
+// ✅ FIX: disable SSR for Plyr
+const Plyr = dynamic(() => import("plyr-react"), {
+  ssr: false
+});
+
 import "plyr-react/plyr.css";
 
 type Source = {
@@ -20,24 +25,28 @@ export default function WatchPage() {
 
   useEffect(() => {
     async function load() {
-      const res = await fetch(
-        `/api/stream?url=${encodeURIComponent(target)}`
-      );
-      const data = await res.json();
+      try {
+        const res = await fetch(
+          `/api/stream?url=${encodeURIComponent(target)}`
+        );
+        const data = await res.json();
 
-      if (data.success) {
-        setSources(data.sources);
+        if (data.success) {
+          setSources(data.sources);
 
-        const best =
-          data.sources.find((s: Source) =>
-            s.url.includes(".m3u8")
-          ) ||
-          data.sources.find((s: Source) =>
-            s.url.includes(".mp4")
-          ) ||
-          data.sources[0];
+          const best =
+            data.sources.find((s: Source) =>
+              s.url.includes(".m3u8")
+            ) ||
+            data.sources.find((s: Source) =>
+              s.url.includes(".mp4")
+            ) ||
+            data.sources[0];
 
-        setCurrent(best);
+          setCurrent(best);
+        }
+      } catch (e) {
+        console.error(e);
       }
     }
 
@@ -63,7 +72,7 @@ export default function WatchPage() {
       <h1 style={{ color: "white" }}>WellPlayer 🎬</h1>
 
       <div style={{ maxWidth: 900, margin: "auto" }}>
-        {current && current.type === "file" && (
+        {current?.type === "file" && (
           <Plyr
             source={videoSource}
             options={{
@@ -80,12 +89,12 @@ export default function WatchPage() {
           />
         )}
 
-        {current && current.type === "iframe" && (
+        {current?.type === "iframe" && (
           <iframe src={current.url} width="100%" height="400" />
         )}
       </div>
 
-      {/* SERVERS */}
+      {/* 🔥 SERVERS */}
       <div style={{ marginTop: 20 }}>
         {sources.map((s, i) => (
           <button
