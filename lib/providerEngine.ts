@@ -4,15 +4,15 @@ import { StreamResponse, Source } from "./types";
 
 // 🔌 PROVIDERS
 import { getMoviesDrive } from "./providers/moviesdrive";
-import { getMyFlixBD } from "./providers/myflixbd/stream";
+import { getMyFlix } from "./providers/myflixbd/stream";
 import { getDirect } from "./providers/direct";
 
-// 🧹 SANITIZE (FIXED)
+// 🧹 SANITIZE (IMPORTANT FIX)
 function sanitizeSources(sources: any[]): Source[] {
   return sources
     .filter((s) => s?.url)
     .map((s) => ({
-      type: s.type === "file" ? "file" : "iframe", // 🔥 FORCE VALID TYPE
+      type: s.type === "file" ? "file" : "iframe", // ✅ force valid type
       url: s.url,
       name: s.name || "Source",
     }));
@@ -25,7 +25,7 @@ export async function getProvider(url: string): Promise<StreamResponse> {
   try {
     // 🔥 1. MYFLIXBD (PRIMARY)
     if (url.includes("myflixbd")) {
-      const myflix = await getMyFlixBD(url);
+      const myflix = await getMyFlix(url);
 
       if (myflix.success && myflix.sources.length > 0) {
         return {
@@ -33,7 +33,7 @@ export async function getProvider(url: string): Promise<StreamResponse> {
           sources: sanitizeSources(myflix.sources),
         };
       } else {
-        logs.push("MyFlixBD failed");
+        logs.push("MyFlix failed");
       }
     }
 
@@ -49,7 +49,7 @@ export async function getProvider(url: string): Promise<StreamResponse> {
       logs.push("MoviesDrive failed");
     }
 
-    // 🔥 3. DIRECT EXTRACT (LAST RESORT)
+    // 🔥 3. DIRECT (LAST RESORT)
     const direct = await getDirect(url);
 
     if (direct.success && direct.sources.length > 0) {
