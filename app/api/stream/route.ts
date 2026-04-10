@@ -1,28 +1,15 @@
 import { NextResponse } from "next/server";
-import { getProvider } from "../../../lib/providerEngine";
+import { getStream } from "@/lib/providers/myflixbd/stream";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-
-  const providerName = searchParams.get("provider");
   const url = searchParams.get("url");
 
-  if (!providerName || !url) {
-    return NextResponse.json(
-      { error: "Missing params" },
-      { status: 400 }
-    );
+  if (!url) {
+    return NextResponse.json({ success: false });
   }
 
-  try {
-    const provider: any = getProvider(providerName);
-    const data = await provider.getStream(url);
+  const data = await getStream(url);
 
-    return NextResponse.json(data);
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Stream failed" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(data);
 }
