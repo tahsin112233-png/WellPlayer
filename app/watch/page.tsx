@@ -1,115 +1,139 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 
-type Server = {
+type Source = {
   name: string;
+  type: "file" | "iframe";
   url: string;
 };
 
 export default function WatchPage() {
-  const [servers, setServers] = useState<Server[]>([]);
-  const [current, setCurrent] = useState<Server | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // 👉 change this dynamically later
-  const imdbId = "tt0499549"; // Avatar test
+  const [sources, setSources] = useState<Source[]>([]);
+  const [current, setCurrent] = useState<Source | null>(null);
+  const [playing, setPlaying] = useState(false);
 
-  // 🔥 BUILD EMBED SERVERS
+  const target =
+    "https://myflixbd.to/movie/avatar-fire-and-ash/";
+
+  // 🔥 LOAD SOURCES
   useEffect(() => {
-    const list: Server[] = [
-      {
-        name: "Server 1",
-        url: `https://vidsrc.to/embed/movie/${imdbId}`,
-      },
-      {
-        name: "Server 2",
-        url: `https://vidlink.pro/movie/${imdbId}`,
-      },
-      {
-        name: "Server 3",
-        url: `https://autoembed.cc/embed/movie/${imdbId}`,
-      },
-    ];
+    async function load() {
+      const res = await fetch(
+        `/api/stream?url=${encodeURIComponent(target)}`
+      );
+      const data = await res.json();
 
-    setServers(list);
-    setCurrent(list[0]); // auto select first
+      if (data.sources?.length) {
+        setSources(data.sources);
+        setCurrent(data.sources[0]);
+      }
+    }
+
+    load();
   }, []);
 
-  // 🔥 AUTO FALLBACK
-  const handleError = () => {
-    if (!current) return;
+  // 🔥 HANDLE VIDEO
+  useEffect(() => {
+    if (!current || current.type !== "file") return;
 
-    const index = servers.findIndex((s) => s.url === current.url);
-    const next = servers[index + 1];
+    const video = videoRef.current;
+    if (!video) return;
 
-    if (next) {
-      setCurrent(next);
+    if (current.url.includes(".m3u8")) {
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(current.url);
+        hls.attachMedia(video);
+      } else {
+        video.src = current.url;
+      }
+    } else {
+      video.src = current.url;
+    }
+  }, [current]);
+
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play();
+      setPlaying(true);
+    } else {
+      video.pause();
+      setPlaying(false);
     }
   };
 
   return (
-    <div
-      style={{
-        background: "#000",
-        color: "#fff",
-        minHeight: "100vh",
-        padding: 16,
-      }}
-    >
-      <h1 style={{ fontSize: 24, marginBottom: 10 }}>
-        WellPlayer 🎬
-      </h1>
+    <div style={{ padding: 20, background: "#000", minHeight: "100vh" }}>
+      <h1 style={{ color: "#fff" }}>WellPlayer 🎬</h1>
 
       {/* 🔥 PLAYER */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          aspectRatio: "16/9",
-          background: "#111",
-          borderRadius: 8,
-          overflow: "hidden",
-        }}
-      >
-        {current && (
+      <div style={{ position: "relative", marginTop: 20 }}>
+        {current?.type === "iframe" ? (
           <iframe
-            key={current.url}
             src={current.url}
             allowFullScreen
-            onError={handleError}
             style={{
               width: "100%",
-              height: "100%",
+              height: 220,
               border: "none",
+              borderRadius: 12
             }}
           />
+        ) : (
+          <>
+            <video
+              ref={videoRef}
+              playsInline
+              style={{
+                width: "100%",
+                borderRadius: 12,
+                background: "black"
+              }}
+            />
+
+            {/* 🔥 overlay control */}
+            <div
+              onClick={togglePlay}
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                color: "white",
+                fontSize: 50,
+                cursor: "pointer"
+              }}
+            >
+              {playing ? "⏸" : "▶"}
+            </div>
+          </>
         )}
       </div>
 
-      {/* 🔥 SERVER BUTTONS */}
-      <div
-        style={{
-          marginTop: 15,
-          display: "flex",
-          gap: 10,
-          flexWrap: "wrap",
-        }}
-      >
-        {servers.map((s, i) => (
+      {/* 🔥 SERVERS */}
+      <div style={{ marginTop: 20 }}>
+        {sources.map((s, i) => (
           <button
             key={i}
             onClick={() => setCurrent(s)}
             style={{
-              padding: "10px 16px",
-              borderRadius: 6,
-              border: "none",
-              cursor: "pointer",
-              background:
-                current?.url === s.url ? "#e50914" : "#333",
+              marginRight: 10,
+              padding: "10px 15px",
+              background: current === s ? "red" : "#333",
               color: "#fff",
+              border: "none",
+              borderRadius: 8
             }}
           >
-            {s.name}
+            {s.name || `Server ${i + 1}`}
           </button>
         ))}
       </div>
