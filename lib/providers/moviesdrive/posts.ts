@@ -15,12 +15,13 @@ export const getPosts = async (): Promise<Post[]> => {
     const $ = cheerio.load(data);
     const results: Post[] = [];
 
-    $(".post-item").each((_, el) => {
-      const title = $(el).find("h2").text().trim();
+    // UPDATED SELECTOR
+    $("article").each((_, el) => {
+      const title = $(el).find("h2.entry-title").text().trim();
       const link = $(el).find("a").attr("href") || "";
       const image = $(el).find("img").attr("src") || "";
 
-      if (title && link) {
+      if (title && link && image) {
         results.push({
           title,
           link,
@@ -31,7 +32,7 @@ export const getPosts = async (): Promise<Post[]> => {
 
     return results.slice(0, 20);
   } catch (error) {
-    console.error(error);
+    console.error("SCRAPER ERROR:", error);
     return [];
   }
 };
