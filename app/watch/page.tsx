@@ -3,31 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 
-type Source = {
-  name: string;
-  type: "file" | "iframe";
-  url: string;
-};
-
 export default function WatchPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const [sources, setSources] = useState<Source[]>([]);
-  const [current, setCurrent] = useState<Source | null>(null);
-  const [mode, setMode] = useState<"iframe" | "video" | "proxy">("iframe");
-
-  const [qualities, setQualities] = useState<any[]>([]);
-  const [hlsInstance, setHlsInstance] = useState<Hls | null>(null);
-
-  const [volume, setVolume] = useState(1);
-  const [brightness, setBrightness] = useState(1);
-
-  const [showControls, setShowControls] = useState(true);
+  const [url, setUrl] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const [showUI, setShowUI] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   const target =
     "https://myflixbd.to/movie/avatar-fire-and-ash/";
 
-  // 🔥 LOAD SOURCES
+  // 🔥 LOAD STREAM
   useEffect(() => {
     async function load() {
       const res = await fetch(
@@ -36,178 +23,133 @@ export default function WatchPage() {
       const data = await res.json();
 
       if (data.success) {
-        setSources(data.sources);
-
-        const best = data.sources[0];
-        setCurrent(best);
-        decideMode(best);
+        const first = data.sources[0];
+        setUrl(first.url);
       }
     }
 
     load();
   }, []);
 
-  // 🔥 AUTO FALLBACK LOGIC
-  const decideMode = (s: Source) => {
-    if (s.type === "iframe") {
-      setMode("iframe");
-    } else if (s.url.includes(".m3u8")) {
-      setMode("video");
-    } else {
-      setMode("proxy");
-    }
-  };
-
-  // 🔥 HLS PLAYER + QUALITY PARSER
+  // 🔥 HLS INIT
   useEffect(() => {
-    if (!videoRef.current || !current) return;
-    if (mode !== "video") return;
+    if (!videoRef.current || !url) return;
 
     const video = videoRef.current;
 
-    if (Hls.isSupported() && current.url.includes(".m3u8")) {
+    if (Hls.isSupported() && url.includes(".m3u8")) {
       const hls = new Hls();
-      hls.loadSource(current.url);
+      hls.loadSource(url);
       hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        const levels = hls.levels;
-        setQualities(levels);
-      });
-
-      setHlsInstance(hls);
     } else {
-      video.src = current.url;
+      video.src = url;
     }
-  }, [current, mode]);
+  }, [url]);
 
-  // 🔥 GESTURE CONTROLS
-  let startY = 0;
+  // 🔥 PROGRESS TRACK
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
 
-  const handleTouchStart = (e: any) => {
-    startY = e.touches[0].clientY;
-  };
+    const interval = setInterval(() => {
+      if (video.duration) {
+        setProgress((video.currentTime / video.duration) * 100);
+      }
+    }, 500);
 
-  const handleTouchMove = (e: any) => {
-    const diff = startY - e.touches[0].clientY;
+    return () => clearInterval(interval);
+  }, []);
 
-    if (e.touches[0].clientX < window.innerWidth / 2) {
-      // brightness
-      setBrightness((b) => Math.min(2, Math.max(0.5, b + diff * 0.005)));
+  // 🔥 PLAY / PAUSE
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play();
+      setPlaying(true);
     } else {
-      // volume
-      const newVol = Math.min(1, Math.max(0, volume + diff * 0.005));
-      setVolume(newVol);
-      if (videoRef.current) videoRef.current.volume = newVol;
+      video.pause();
+      setPlaying(false);
     }
   };
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh", color: "white" }}>
-      
-      {/* PLAYER */}
+    <div style={{ background: "#000", minHeight: "100vh" }}>
       <div
-        style={{
-          position: "relative",
-          maxWidth: 900,
-          margin: "auto",
-          filter: `brightness(${brightness})`,
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onClick={() => setShowControls(!showControls)}
+        style={{ position: "relative", maxWidth: 900, margin: "auto" }}
+        onClick={() => setShowUI(!showUI)}
       >
-        {/* 🔥 IFRAME MODE */}
-        {mode === "iframe" && current && (
-          <iframe
-            src={current.url}
-            width="100%"
-            height="400"
-            allow="autoplay; fullscreen"
-            allowFullScreen
-            style={{ border: "none" }}
-          />
+        {/* VIDEO */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          style={{
+            width: "100%",
+            background: "black",
+            pointerEvents: "none"
+          }}
+        />
+
+        {/* CLICK LAYER */}
+        <div
+          onClick={togglePlay}
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 5
+          }}
+        />
+
+        {/* CENTER BUTTON */}
+        {showUI && (
+          <div
+            onClick={togglePlay}
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              fontSize: 60,
+              color: "white",
+              zIndex: 10
+            }}
+          >
+            {playing ? "⏸" : "▶"}
+          </div>
         )}
 
-        {/* 🔥 VIDEO MODE */}
-        {mode !== "iframe" && (
-          <video
-            ref={videoRef}
-            controls={false}
-            autoPlay
-            style={{ width: "100%" }}
-            src={
-              mode === "proxy"
-                ? `/api/proxy?url=${encodeURIComponent(current?.url || "")}`
-                : undefined
-            }
-          />
-        )}
-
-        {/* 🔥 NETFLIX STYLE CONTROLS */}
-        {showControls && (
+        {/* BOTTOM CONTROLS */}
+        {showUI && (
           <div
             style={{
               position: "absolute",
               bottom: 0,
               width: "100%",
-              background:
-                "linear-gradient(to top, rgba(0,0,0,0.8), transparent)",
               padding: 10,
+              background:
+                "linear-gradient(to top, rgba(0,0,0,0.8), transparent)"
             }}
           >
-            {/* PLAY / PAUSE */}
-            <button
-              onClick={() => {
-                const v = videoRef.current;
-                if (!v) return;
-                v.paused ? v.play() : v.pause();
+            {/* PROGRESS BAR */}
+            <div
+              style={{
+                height: 5,
+                background: "#444",
+                borderRadius: 5
               }}
-              style={{ marginRight: 10 }}
             >
-              ▶ / ⏸
-            </button>
-
-            {/* QUALITY SELECTOR */}
-            {qualities.length > 0 && (
-              <select
-                onChange={(e) => {
-                  const level = parseInt(e.target.value);
-                  if (hlsInstance) hlsInstance.currentLevel = level;
+              <div
+                style={{
+                  width: `${progress}%`,
+                  height: "100%",
+                  background: "#ff0000"
                 }}
-              >
-                {qualities.map((q, i) => (
-                  <option key={i} value={i}>
-                    {q.height}p
-                  </option>
-                ))}
-              </select>
-            )}
+              />
+            </div>
           </div>
         )}
-      </div>
-
-      {/* 🔥 SERVERS */}
-      <div style={{ padding: 20 }}>
-        {sources.map((s, i) => (
-          <button
-            key={i}
-            onClick={() => {
-              setCurrent(s);
-              decideMode(s);
-            }}
-            style={{
-              marginRight: 10,
-              padding: "10px 15px",
-              background: current === s ? "#ff4444" : "#222",
-              color: "white",
-              border: "none",
-              borderRadius: 6,
-            }}
-          >
-            Server {i + 1}
-          </button>
-        ))}
       </div>
     </div>
   );
