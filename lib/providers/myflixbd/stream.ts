@@ -12,20 +12,22 @@ export const getStream = async (url: string): Promise<Stream[]> => {
     const m3u8Matches = data.match(/https?:\/\/[^"]+\.m3u8/g) || [];
     const mp4Matches = data.match(/https?:\/\/[^"]+\.mp4/g) || [];
 
-    // 🔥 Prefer m3u8 (real streams)
+    // 🔥 Prefer m3u8
     if (m3u8Matches.length > 0) {
       const unique = Array.from(new Set(m3u8Matches));
-      return unique.map((link) => ({
+
+      return unique.map((link: string) => ({
         server: "MyFlixBD",
         link,
         type: "m3u8",
       }));
     }
 
-    // 🔥 fallback to mp4 (even if tutorial)
+    // 🔥 fallback to mp4
     if (mp4Matches.length > 0) {
       const unique = Array.from(new Set(mp4Matches));
-      return unique.map((link) => ({
+
+      return unique.map((link: string) => ({
         server: "MyFlixBD",
         link,
         type: "mp4",
