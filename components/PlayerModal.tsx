@@ -7,10 +7,9 @@ export default function PlayerModal({ movie, onClose }: any) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [qualities, setQualities] = useState<any[]>([]);
-  const [sources, setSources] = useState<any[]>([]);
   const [current, setCurrent] = useState<any>(null);
 
-  // 🔥 load qualities
+  // 🎯 Load qualities
   useEffect(() => {
     if (!movie) return;
 
@@ -19,16 +18,22 @@ export default function PlayerModal({ movie, onClose }: any) {
     });
   }, [movie]);
 
-  // 🎬 load stream
-  async function play(url: string) {
+  // 🔁 AUTO RETRY PLAYER
+  async function play(url: string, tried: string[] = []) {
     const res = await getStream(url);
-    if (res.success) {
-      setSources(res.sources);
+
+    if (res.success && res.sources?.length) {
       setCurrent(res.sources[0]);
+    } else {
+      const next = qualities.find((q) => !tried.includes(q.url));
+
+      if (next) {
+        play(next.url, [...tried, url]);
+      }
     }
   }
 
-  // 🎥 video loader
+  // 🎥 Load video
   useEffect(() => {
     if (!videoRef.current || !current) return;
 
@@ -36,9 +41,11 @@ export default function PlayerModal({ movie, onClose }: any) {
 
     if (current.url.includes(".m3u8")) {
       import("hls.js").then((Hls) => {
-        const hls = new Hls.default();
-        hls.loadSource(current.url);
-        hls.attachMedia(video);
+        if (Hls.default.isSupported()) {
+          const hls = new Hls.default();
+          hls.loadSource(current.url);
+          hls.attachMedia(video);
+        }
       });
     } else {
       video.src = current.url;
@@ -52,7 +59,8 @@ export default function PlayerModal({ movie, onClose }: any) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.9)",
+        backdropFilter: "blur(20px)",
+        background: "rgba(0,0,0,0.85)",
         zIndex: 999,
         padding: 20,
       }}
@@ -67,11 +75,22 @@ export default function PlayerModal({ movie, onClose }: any) {
           ref={videoRef}
           controls
           autoPlay
-          style={{ width: "100%", marginTop: 10 }}
-        />
+          style={{
+            width: "100%",
+            marginTop: 10,
+            borderRadius: 10,
+          }}
+        >
+          <track
+            kind="subtitles"
+            src="/sample.vtt"
+            srcLang="en"
+            label="English"
+          />
+        </video>
       )}
 
-      {/* 🎯 QUALITIES */}
+      {/* 🎯 QUALITY BUTTONS */}
       <div style={{ marginTop: 20 }}>
         {qualities.map((q, i) => (
           <button
@@ -80,9 +99,10 @@ export default function PlayerModal({ movie, onClose }: any) {
             style={{
               marginRight: 10,
               padding: 10,
-              background: "red",
+              background: "#ff4444",
               color: "white",
               borderRadius: 6,
+              border: "none",
             }}
           >
             {q.quality}
