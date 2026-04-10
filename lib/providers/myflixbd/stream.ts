@@ -9,19 +9,40 @@ type Source = {
 
 export async function getStream(url: string) {
   try {
+    const sources: Source[] = [];
+
+    // 🔥 STEP 1 — Load movie page
     const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-      },
+      headers: { "User-Agent": "Mozilla/5.0" },
     });
 
     const $ = cheerio.load(data);
 
-    const sources: Source[] = [];
+    // 🔥 STEP 2 — FIND WATCH PAGE LINK
+    let watchUrl = "";
 
-    // 🔥 1. FIND IFRAME SOURCES (MyFlixBD style)
-    $("iframe").each((i, el) => {
-      const src = $(el).attr("src");
+    $("a").each((_, el) => {
+      const href = $(el).attr("href");
+
+      if (href && href.includes("/watch/")) {
+        watchUrl = href.startsWith("http")
+          ? href
+          : `https://myflixbd.to${href}`;
+      }
+    });
+
+    if (!watchUrl) {
+      return { success: false, sources: [] };
+    }
+
+    // 🔥 STEP 3 — Load watch page
+    const res = await axios.get(watchUrl);
+    const $$ = cheerio.load(res.data);
+
+    // 🔥 STEP 4 — Extract iframe
+    $$("iframe").each((_, el) => {
+      const src = $$(el).attr("src");
+
       if (src && src.startsWith("http")) {
         sources.push({
           name: `Server ${sources.length + 1}`,
@@ -31,26 +52,14 @@ export async function getStream(url: string) {
       }
     });
 
-    // 🔥 2. FIND JWPLAYER FILES (VERY IMPORTANT)
-    const scripts = $("script").map((_, el) => $(el).html()).get();
+    // 🔥 STEP 5 — Extract m3u8 from scripts
+    const scripts = $$("script").map((_, el) => $$(el).html()).get();
 
     for (const script of scripts) {
       if (!script) continue;
 
-      // match file:"https://..."
-      const match = script.match(/file:\s*"(https[^"]+)"/);
-
-      if (match && match[1]) {
-        sources.push({
-          name: `Server ${sources.length + 1}`,
-          type: "file",
-          url: match[1],
-        });
-      }
-
-      // match sources: [{file:"..."}]
-      const m3u8 = script.match(/"(https[^"]+\.m3u8[^"]*)"/);
-      if (m3u8 && m3u8[1]) {
+      const m3u8 = script.match(/(https[^"]+\.m3u8[^"]*)/);
+      if (m3u8) {
         sources.push({
           name: `Server ${sources.length + 1}`,
           type: "file",
@@ -59,18 +68,11 @@ export async function getStream(url: string) {
       }
     }
 
-    // 🔥 3. CLEAN DUPLICATES
-    const unique = Array.from(
-      new Map(sources.map((s) => [s.url, s])).values()
-    );
-
     return {
       success: true,
-      sources: unique,
+      sources,
     };
   } catch (err) {
-    console.error("STREAM ERROR:", err);
-
     return {
       success: false,
       sources: [],
