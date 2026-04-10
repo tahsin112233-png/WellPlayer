@@ -1,66 +1,83 @@
 import axios from "axios";
+import * as cheerio from "cheerio";
 
-export async function getStream(url: string) {
+type Source = {
+  type: "iframe" | "file";
+  url: string;
+  name: string;
+};
+
+export async function getStream(target: string) {
+  const sources: Source[] = [];
+
   try {
+    // 🔥 HEADERS (VERY IMPORTANT)
     const headers = {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-      "Referer": "https://myflixbd.to/",
+      Accept: "*/*",
+      Referer: "https://myflixbd.to/",
     };
 
-    const sources: any[] = [];
-
     // 🔥 STEP 1: LOAD PAGE
-    const page = await axios.get(url, { headers });
-    const html = page.data;
+    const res = await axios.get(target, { headers });
+    const html = res.data;
 
-    // 🔥 STEP 2: EXTRACT IFRAME DIRECTLY (NO postid)
-    const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+    const $ = cheerio.load(html);
 
-    if (!iframeMatch) {
+    // 🔥 STEP 2: FIND IFRAME
+    let iframeUrl =
+      $("iframe").attr("src") ||
+      $("iframe").attr("data-src") ||
+      "";
+
+    if (!iframeUrl) {
       return {
         success: false,
         sources: [],
-        debug: "iframe not found (blocked or changed)",
+        debug: "iframe not found",
       };
     }
 
-    const iframeUrl = iframeMatch[1];
+    // 🔥 FIX RELATIVE URL
+    if (iframeUrl.startsWith("/")) {
+      iframeUrl = "https://myflixbd.to" + iframeUrl;
+    }
 
-    // ✅ push iframe
+    console.log("STEP 2 iframe:", iframeUrl);
+
+    // 🔥 STEP 3: RESOLVE SHORTLINK
+    let finalUrl = iframeUrl;
+
+    if (iframeUrl.includes("short.icu")) {
+      try {
+        const redirect = await axios.get(iframeUrl, {
+          headers,
+          maxRedirects: 0, // 👈 CRITICAL
+          validateStatus: (s) => s >= 200 && s < 400,
+        });
+
+        const location = redirect.headers.location;
+
+        if (location) {
+          finalUrl = location;
+          console.log("Resolved shortlink:", finalUrl);
+        }
+      } catch (err: any) {
+        const location = err?.response?.headers?.location;
+        if (location) {
+          finalUrl = location;
+          console.log("Resolved (catch):", finalUrl);
+        }
+      }
+    }
+
+    // 🔥 STEP 4: PUSH IFRAME SOURCE
     sources.push({
       type: "iframe",
-      url: iframeUrl,
+      url: finalUrl,
       name: "Embed",
     });
-
-    // 🔥 STEP 3: LOAD IFRAME PAGE
-    const iframePage = await axios.get(iframeUrl, { headers });
-    const iframeHtml = iframePage.data;
-
-    // 🔥 STEP 4: EXTRACT MP4
-    const mp4 = iframeHtml.match(/https?:\/\/.*?\.mp4/g);
-    if (mp4) {
-      mp4.forEach((url) => {
-        sources.push({
-          type: "file",
-          url,
-          name: "MP4",
-        });
-      });
-    }
-
-    // 🔥 STEP 5: EXTRACT M3U8
-    const m3u8 = iframeHtml.match(/https?:\/\/.*?\.m3u8/g);
-    if (m3u8) {
-      m3u8.forEach((url) => {
-        sources.push({
-          type: "file",
-          url,
-          name: "HLS",
-        });
-      });
-    }
 
     return {
       success: true,
@@ -70,7 +87,7 @@ export async function getStream(url: string) {
     return {
       success: false,
       sources: [],
-      error: err.message,
+      debug: err.message,
     };
   }
 }
