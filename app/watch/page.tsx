@@ -115,30 +115,30 @@ export default function WatchPage() {
             allowFullScreen
           />
         ) : (
-          <>
-            {/* VIDEO */}
+          <div style={{ position: "relative" }}>
+            {/* 🔥 VIDEO (NO NATIVE CONTROL) */}
             <video
               ref={videoRef}
               playsInline
               autoPlay
-              controls={false}
+              muted
               style={{
                 width: "100%",
                 background: "black",
+                pointerEvents: "none"
               }}
             />
 
-            {/* 🚫 FORCE HIDE NATIVE CONTROLS */}
-            <style>
-              {`
-                video::-webkit-media-controls {
-                  display: none !important;
-                }
-                video::-webkit-media-controls-enclosure {
-                  display: none !important;
-                }
-              `}
-            </style>
+            {/* 🔥 CLICK LAYER */}
+            <div
+              onClick={togglePlay}
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 5,
+                cursor: "pointer"
+              }}
+            />
 
             {/* ▶ CENTER BUTTON */}
             <div
@@ -150,54 +150,12 @@ export default function WatchPage() {
                 transform: "translate(-50%, -50%)",
                 fontSize: 60,
                 color: "white",
-                cursor: "pointer",
-                zIndex: 10,
+                zIndex: 10
               }}
             >
               {playing ? "⏸" : "▶"}
             </div>
-
-            {/* 🔝 TOP GRADIENT */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                width: "100%",
-                height: 60,
-                background:
-                  "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
-              }}
-            />
-
-            {/* 🔻 BOTTOM BAR */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                width: "100%",
-                padding: 10,
-                background:
-                  "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <button
-                onClick={togglePlay}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "white",
-                  fontSize: 20,
-                }}
-              >
-                {playing ? "⏸" : "▶"}
-              </button>
-
-              <span style={{ color: "white" }}>WellPlayer</span>
-            </div>
-          </>
+          </div>
         )}
       </div>
 
