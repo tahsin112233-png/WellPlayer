@@ -1,64 +1,86 @@
 import axios from "axios";
-import * as cheerio from "cheerio";
 
 export async function getStream(url: string) {
   try {
-    const { data } = await axios.get(url, {
+    const sources: any[] = [];
+
+    // STEP 1: LOAD PAGE
+    const page = await axios.get(url, {
       headers: {
         "User-Agent": "Mozilla/5.0",
+        "Referer": "https://myflixbd.to/",
       },
     });
 
-    const $ = cheerio.load(data);
+    const html = page.data;
 
-    const sources: any[] = [];
+    // STEP 2: EXTRACT MOVIE ID
+    const idMatch = html.match(/postid\s*=\s*["'](\d+)["']/i);
+    const movieId = idMatch?.[1];
 
-    // ✅ 1. iframe
-    $("iframe").each((_, el) => {
-      const src = $(el).attr("src");
-      if (src) {
+    if (!movieId) {
+      return { success: false, sources: [] };
+    }
+
+    // STEP 3: CALL AJAX (REAL SOURCE)
+    const ajax = await axios.get(
+      "https://myflixbd.to/wp-admin/admin-ajax.php",
+      {
+        params: {
+          action: "doo_player_ajax",
+          post: movieId,
+          nume: "1",
+          type: "movie",
+        },
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+          "X-Requested-With": "XMLHttpRequest",
+          "Referer": url,
+        },
+      }
+    );
+
+    const playerHtml = ajax.data?.embed || "";
+
+    // STEP 4: EXTRACT IFRAME
+    const iframeMatch = playerHtml.match(/src=["'](.*?)["']/);
+    if (iframeMatch) {
+      sources.push({
+        type: "iframe",
+        url: iframeMatch[1],
+        name: "MyFlixBD",
+      });
+    }
+
+    // STEP 5: EXTRACT MP4
+    const mp4 = playerHtml.match(/https?:\/\/.*?\.mp4/g);
+    if (mp4) {
+      mp4.forEach((url) => {
         sources.push({
-          type: "iframe",
-          url: src,
-          name: "iframe",
+          type: "file",
+          url,
+          name: "MP4",
         });
-      }
-    });
+      });
+    }
 
-    // ✅ 2. script scan (MP4 + M3U8)
-    $("script").each((_, el) => {
-      const text = $(el).html() || "";
-
-      // 🔥 MP4 detection
-      const mp4 = text.match(/https?:\/\/.*?\.mp4/g);
-      if (mp4) {
-        mp4.forEach((url) => {
-          sources.push({
-            type: "file",
-            url,
-            name: "mp4",
-          });
+    // STEP 6: EXTRACT M3U8
+    const m3u8 = playerHtml.match(/https?:\/\/.*?\.m3u8/g);
+    if (m3u8) {
+      m3u8.forEach((url) => {
+        sources.push({
+          type: "file",
+          url,
+          name: "HLS",
         });
-      }
-
-      // 🔥 M3U8 detection
-      const m3u8 = text.match(/https?:\/\/.*?\.m3u8/g);
-      if (m3u8) {
-        m3u8.forEach((url) => {
-          sources.push({
-            type: "file",
-            url,
-            name: "hls",
-          });
-        });
-      }
-    });
+      });
+    }
 
     return {
       success: true,
       sources,
     };
-  } catch (e) {
+  } catch {
     return {
       success: false,
       sources: [],
