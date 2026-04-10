@@ -1,8 +1,10 @@
+// lib/providers/myflixbd/stream.ts
+
 import axios from "axios";
+import * as cheerio from "cheerio";
+import { StreamResponse, Source } from "../../types";
 
-export async function getMyFlix(url: string) {
-  const sources: any[] = [];
-
+export async function getMyFlix(url: string): Promise<StreamResponse> {
   try {
     const headers = {
       "User-Agent": "Mozilla/5.0",
@@ -10,49 +12,60 @@ export async function getMyFlix(url: string) {
       Referer: "https://myflixbd.to/",
     };
 
+    // 🔥 STEP 1: LOAD PAGE
     const res = await axios.get(url, { headers });
     const html = res.data;
 
-    // 🔥 extract iframe (basic but working)
-    const match = html.match(/<iframe.*?src="(.*?)"/);
+    const $ = cheerio.load(html);
 
-    if (!match) {
-      return { success: false, sources: [], debug: "iframe not found" };
+    let sources: Source[] = [];
+
+    // 🔥 STEP 2: FIND IFRAME
+    const iframe = $("iframe").attr("src");
+
+    if (!iframe) {
+      return {
+        success: false,
+        sources: [],
+      };
     }
 
-    let iframeUrl = match[1];
+    let finalUrl = iframe;
 
-    // fix relative
-    if (iframeUrl.startsWith("//")) {
-      iframeUrl = "https:" + iframeUrl;
+    // 🔥 STEP 3: RESOLVE SHORTLINK
+    if (iframe.includes("short.icu")) {
+      try {
+        const redirect = await axios.get(iframe, {
+          headers,
+          maxRedirects: 0,
+          validateStatus: (s) => s >= 200 && s < 400,
+        });
+
+        const location = redirect.headers.location;
+
+        if (location) {
+          finalUrl = location;
+        }
+      } catch (err: any) {
+        // fallback keep iframe
+      }
     }
 
-    // 🔥 resolve shortlink
-    let finalUrl = iframeUrl;
-
-    if (iframeUrl.includes("short.icu")) {
-      const redirect = await axios.get(iframeUrl, {
-        headers,
-        maxRedirects: 0,
-        validateStatus: (s) => s >= 200 && s < 400,
-      });
-
-      const location = redirect.headers.location;
-      if (location) finalUrl = location;
-    }
-
+    // 🔥 STEP 4: PUSH SOURCE
     sources.push({
       type: "iframe",
       url: finalUrl,
-      name: "MyFlixBD",
+      name: "Embed",
     });
 
-    return { success: true, sources };
-  } catch (e: any) {
+    return {
+      success: true,
+      sources,
+    };
+  } catch (err) {
     return {
       success: false,
       sources: [],
-      debug: e.message,
     };
   }
 }
