@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSources } from "@/lib/providers";
+import { getStream } from "@/lib/providers/myflixbd/stream";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -9,10 +9,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, sources: [] });
   }
 
-  const sources = await getSources(url);
+  const data = await getStream(url);
 
-  return NextResponse.json({
-    success: true,
-    sources
-  });
+  return NextResponse.json(data);
 }
