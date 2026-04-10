@@ -1,9 +1,16 @@
-export async function getDirect() {
-  return [
-    {
-      type: "file",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      name: "Direct Fallback",
-    },
-  ];
+export function getDirect(url: string) {
+  if (url.endsWith(".mp4") || url.endsWith(".m3u8")) {
+    return {
+      success: true,
+      sources: [
+        {
+          type: "file",
+          url,
+          name: "Direct",
+        },
+      ],
+    };
+  }
+
+  return { success: false, sources: [] };
 }
