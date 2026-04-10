@@ -1,5 +1,4 @@
 import axios from "axios";
-import * as cheerio from "cheerio";
 import { Stream } from "../../types/provider";
 
 export const getStream = async (url: string): Promise<Stream[]> => {
@@ -10,21 +9,31 @@ export const getStream = async (url: string): Promise<Stream[]> => {
       },
     });
 
-    const $ = cheerio.load(data);
-
     const streams: Stream[] = [];
 
-    // Find iframe (player)
-    $("iframe").each((_, el) => {
-      const src = $(el).attr("src");
+    // 🔥 Extract m3u8/mp4 from raw HTML
+    const m3u8Match = data.match(/https?:\/\/[^"]+\.m3u8/g);
+    const mp4Match = data.match(/https?:\/\/[^"]+\.mp4/g);
 
-      if (src) {
+    if (m3u8Match) {
+      m3u8Match.forEach((link: string) => {
         streams.push({
           server: "MyFlixBD",
-          link: src.startsWith("http") ? src : "https:" + src,
+          link,
+          type: "m3u8",
         });
-      }
-    });
+      });
+    }
+
+    if (mp4Match) {
+      mp4Match.forEach((link: string) => {
+        streams.push({
+          server: "MyFlixBD",
+          link,
+          type: "mp4",
+        });
+      });
+    }
 
     return streams;
   } catch (err) {
