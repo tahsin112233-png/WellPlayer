@@ -1,94 +1,86 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function WatchPage() {
-  const [video, setVideo] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [sources, setSources] = useState<any[]>([]);
+  const [current, setCurrent] = useState<any>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
+  // 🔥 Fetch stream
   useEffect(() => {
-    const api =
-      "https://well-player.vercel.app/api/stream?provider=myflixbd&url=https://myflixbd.to/movie/avatar-fire-and-ash/";
+    const load = async () => {
+      try {
+        const res = await fetch("/api/stream?url=https://myflixbd.to/movie/avatar-fire-and-ash/");
+        const data = await res.json();
 
-    fetch(api)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.length > 0) {
-          setVideo(data[0].link);
+        if (data.success) {
+          setSources(data.sources);
+          setCurrent(data.sources[0]);
         }
-        setLoading(false);
-      });
+      } catch (err) {
+        console.log("error loading stream");
+      }
+    };
+
+    load();
   }, []);
 
-  return (
-    <div
-      style={{
-        background: "#000",
-        minHeight: "100vh",
-        color: "#fff",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: "12px 16px",
-          fontSize: "18px",
-          fontWeight: "bold",
-        }}
-      >
-        WellPlayer 🎬
-      </div>
+  // 🔥 Handle video load
+  useEffect(() => {
+    if (!current || !videoRef.current) return;
 
-      {/* Player */}
-      <div
-        style={{
-          width: "100%",
-          aspectRatio: "16/9",
-          background: "#111",
-        }}
-      >
-        {loading ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: "#888",
-            }}
-          >
-            Loading stream...
-          </div>
-        ) : video ? (
-          <video
-            src={video}
-            controls
-            autoPlay
-            style={{
-              width: "100%",
-              height: "100%",
-            }}
+    if (current.type === "file") {
+      videoRef.current.src = current.url;
+    }
+  }, [current]);
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>WellPlayer 🎬</h1>
+
+      {/* 🔥 PLAYER */}
+      <div style={{ width: "100%", height: 250, background: "#000" }}>
+        {current?.type === "iframe" ? (
+          <iframe
+            src={current.url}
+            width="100%"
+            height="100%"
+            allowFullScreen
           />
         ) : (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: "red",
-            }}
-          >
-            Failed to load video
-          </div>
+          <video
+            ref={videoRef}
+            controls
+            width="100%"
+            height="100%"
+          />
         )}
       </div>
 
-      {/* Controls section (future upgrade placeholder) */}
-      <div style={{ padding: "16px" }}>
-        <p style={{ color: "#aaa", fontSize: "14px" }}>
-          More features coming: Skip Intro • Servers • Episodes • Quality ⚡
-        </p>
+      {/* 🔥 ERROR */}
+      {!current && (
+        <p style={{ color: "red" }}>Failed to load video</p>
+      )}
+
+      {/* 🔥 SERVERS */}
+      <div style={{ marginTop: 20 }}>
+        {sources.map((s, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(s)}
+            style={{
+              marginRight: 10,
+              padding: "8px 12px",
+              background: current === s ? "red" : "gray",
+              color: "#fff",
+              border: "none",
+              borderRadius: 5,
+            }}
+          >
+            {s.name}
+          </button>
+        ))}
       </div>
     </div>
   );
