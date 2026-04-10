@@ -10,170 +10,155 @@ type Source = {
 
 export default function WatchPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [sources, setSources] = useState<Source[]>([]);
   const [current, setCurrent] = useState<Source | null>(null);
-  const [mode, setMode] = useState<"iframe" | "video">("video");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"iframe" | "video">("iframe");
 
   const target =
     "https://myflixbd.to/movie/avatar-fire-and-ash/";
 
-  // 🔥 FETCH STREAM
+  // 🔥 FETCH API
   useEffect(() => {
     async function load() {
-      try {
-        setLoading(true);
-        setError(null);
+      const res = await fetch(
+        `/api/stream?url=${encodeURIComponent(target)}`
+      );
+      const data = await res.json();
 
-        const res = await fetch(
-          `/api/stream?url=${encodeURIComponent(target)}`
-        );
-
-        const data = await res.json();
-        console.log("API DATA:", data);
-
-        if (data.success && data.sources.length) {
-          setSources(data.sources);
-        } else {
-          setError("No playable sources found");
-        }
-      } catch (err) {
-        setError("Failed to load stream");
-      } finally {
-        setLoading(false);
+      if (data.success) {
+        setSources(data.sources);
       }
     }
 
     load();
   }, []);
 
-  // 🔥 AUTO SELECT BEST SOURCE (VIDEO FIRST)
+  // 🔥 AUTO SELECT
   useEffect(() => {
     if (!sources.length) return;
 
-    const file = sources.find((s) => s.type === "file");
-    const iframe = sources.find((s) => s.type === "iframe");
-
-    if (file) {
-      setCurrent(file);
-      setMode("video");
-    } else if (iframe) {
-      setCurrent(iframe);
-      setMode("iframe");
-    }
+    setCurrent(sources[0]);
+    setMode("iframe");
   }, [sources]);
 
-  // 🔥 LOAD VIDEO (MP4 + HLS SAFE)
+  // 🔥 MAGIC: EXTRACT VIDEO FROM IFRAME
   useEffect(() => {
-    if (!videoRef.current || !current || mode !== "video") return;
+    if (!iframeRef.current || mode !== "iframe") return;
 
-    let hls: any;
+    const interval = setInterval(() => {
+      try {
+        const iframeDoc =
+          iframeRef.current?.contentWindow?.document;
+
+        if (!iframeDoc) return;
+
+        const html = iframeDoc.documentElement.innerHTML;
+
+        // 🔥 extract mp4
+        const mp4 = html.match(
+          /https?:\/\/[^"' ]+\.mp4[^"' ]*/
+        );
+
+        const m3u8 = html.match(
+          /https?:\/\/[^"' ]+\.m3u8[^"' ]*/
+        );
+
+        if (mp4 || m3u8) {
+          const url = mp4?.[0] || m3u8?.[0];
+
+          console.log("FOUND VIDEO:", url);
+
+          setCurrent({
+            type: "file",
+            url,
+            name: "Extracted",
+          });
+
+          setMode("video");
+          clearInterval(interval);
+        }
+      } catch (e) {
+        // cross-origin → ignore
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [mode]);
+
+  // 🔥 LOAD VIDEO
+  useEffect(() => {
+    if (!videoRef.current || mode !== "video" || !current)
+      return;
+
     const video = videoRef.current;
 
     if (current.url.endsWith(".m3u8")) {
       import("hls.js").then((Hls) => {
         if (Hls.default.isSupported()) {
-          hls = new Hls.default();
+          const hls = new Hls.default();
           hls.loadSource(current.url);
           hls.attachMedia(video);
-        } else {
-          video.src = current.url;
         }
       });
     } else {
       video.src = current.url;
     }
-
-    return () => {
-      if (hls) hls.destroy(); // 🧹 cleanup
-    };
   }, [current, mode]);
 
   return (
-    <div
-      style={{
-        padding: 20,
-        background: "black",
-        minHeight: "100vh",
-        color: "white",
-      }}
-    >
-      <h1>WellPlayer 🎬</h1>
+    <div style={{ padding: 20, background: "black", minHeight: "100vh" }}>
+      <h1 style={{ color: "white" }}>WellPlayer 🎬</h1>
 
-      {/* 🔄 LOADING */}
-      {loading && <p>Loading player...</p>}
-
-      {/* ❌ ERROR */}
-      {error && (
-        <div>
-          <p>{error}</p>
-          <button
-            onClick={() => location.reload()}
-            style={{
-              padding: "8px 12px",
-              background: "red",
-              border: "none",
-              color: "white",
-              borderRadius: 6,
-            }}
-          >
-            Retry
-          </button>
-        </div>
+      {/* IFRAME MODE */}
+      {current && mode === "iframe" && (
+        <iframe
+          ref={iframeRef}
+          src={current.url}
+          style={{
+            width: "100%",
+            height: 220,
+            border: "none",
+            borderRadius: 12,
+          }}
+          allowFullScreen
+        />
       )}
 
-      {/* 🎬 PLAYER */}
-      {!loading && !error && current && (
-        <>
-          {mode === "iframe" ? (
-            <iframe
-              src={current.url}
-              allowFullScreen
-              style={{
-                width: "100%",
-                height: 220,
-                border: "none",
-                borderRadius: 12,
-                background: "black",
-              }}
-            />
-          ) : (
-            <video
-              ref={videoRef}
-              controls
-              autoPlay
-              style={{
-                width: "100%",
-                borderRadius: 12,
-                background: "black",
-              }}
-            />
-          )}
-        </>
+      {/* VIDEO MODE */}
+      {current && mode === "video" && (
+        <video
+          ref={videoRef}
+          controls
+          autoPlay
+          style={{
+            width: "100%",
+            borderRadius: 12,
+            background: "black",
+          }}
+        />
       )}
 
-      {/* 🔁 SERVERS */}
+      {/* SERVERS */}
       <div style={{ marginTop: 20 }}>
         {sources.map((s, i) => (
           <button
             key={i}
             onClick={() => {
               setCurrent(s);
-              setMode(s.type === "file" ? "video" : "iframe");
+              setMode(s.type === "iframe" ? "iframe" : "video");
             }}
             style={{
               marginRight: 10,
               padding: "10px 15px",
-              background:
-                current?.url === s.url ? "#ff4444" : "#333",
+              background: "red",
               color: "white",
               border: "none",
               borderRadius: 6,
             }}
           >
-            {s.name || `Server ${i + 1}`}
+            Server {i + 1}
           </button>
         ))}
       </div>
