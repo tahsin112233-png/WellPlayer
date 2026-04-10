@@ -1,155 +1,117 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Hls from "hls.js";
+import { useEffect, useState } from "react";
+
+type Server = {
+  name: string;
+  url: string;
+};
 
 export default function WatchPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [servers, setServers] = useState<Server[]>([]);
+  const [current, setCurrent] = useState<Server | null>(null);
 
-  const [url, setUrl] = useState("");
-  const [playing, setPlaying] = useState(false);
-  const [showUI, setShowUI] = useState(true);
-  const [progress, setProgress] = useState(0);
+  // 👉 change this dynamically later
+  const imdbId = "tt0499549"; // Avatar test
 
-  const target =
-    "https://myflixbd.to/movie/avatar-fire-and-ash/";
-
-  // 🔥 LOAD STREAM
+  // 🔥 BUILD EMBED SERVERS
   useEffect(() => {
-    async function load() {
-      const res = await fetch(
-        `/api/stream?url=${encodeURIComponent(target)}`
-      );
-      const data = await res.json();
+    const list: Server[] = [
+      {
+        name: "Server 1",
+        url: `https://vidsrc.to/embed/movie/${imdbId}`,
+      },
+      {
+        name: "Server 2",
+        url: `https://vidlink.pro/movie/${imdbId}`,
+      },
+      {
+        name: "Server 3",
+        url: `https://autoembed.cc/embed/movie/${imdbId}`,
+      },
+    ];
 
-      if (data.success) {
-        const first = data.sources[0];
-        setUrl(first.url);
-      }
-    }
-
-    load();
+    setServers(list);
+    setCurrent(list[0]); // auto select first
   }, []);
 
-  // 🔥 HLS INIT
-  useEffect(() => {
-    if (!videoRef.current || !url) return;
+  // 🔥 AUTO FALLBACK
+  const handleError = () => {
+    if (!current) return;
 
-    const video = videoRef.current;
+    const index = servers.findIndex((s) => s.url === current.url);
+    const next = servers[index + 1];
 
-    if (Hls.isSupported() && url.includes(".m3u8")) {
-      const hls = new Hls();
-      hls.loadSource(url);
-      hls.attachMedia(video);
-    } else {
-      video.src = url;
-    }
-  }, [url]);
-
-  // 🔥 PROGRESS TRACK
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const interval = setInterval(() => {
-      if (video.duration) {
-        setProgress((video.currentTime / video.duration) * 100);
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // 🔥 PLAY / PAUSE
-  const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.paused) {
-      video.play();
-      setPlaying(true);
-    } else {
-      video.pause();
-      setPlaying(false);
+    if (next) {
+      setCurrent(next);
     }
   };
 
   return (
-    <div style={{ background: "#000", minHeight: "100vh" }}>
+    <div
+      style={{
+        background: "#000",
+        color: "#fff",
+        minHeight: "100vh",
+        padding: 16,
+      }}
+    >
+      <h1 style={{ fontSize: 24, marginBottom: 10 }}>
+        WellPlayer 🎬
+      </h1>
+
+      {/* 🔥 PLAYER */}
       <div
-        style={{ position: "relative", maxWidth: 900, margin: "auto" }}
-        onClick={() => setShowUI(!showUI)}
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: "16/9",
+          background: "#111",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
       >
-        {/* VIDEO */}
-        <video
-          ref={videoRef}
-          playsInline
-          autoPlay
-          style={{
-            width: "100%",
-            background: "black",
-            pointerEvents: "none"
-          }}
-        />
-
-        {/* CLICK LAYER */}
-        <div
-          onClick={togglePlay}
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 5
-          }}
-        />
-
-        {/* CENTER BUTTON */}
-        {showUI && (
-          <div
-            onClick={togglePlay}
+        {current && (
+          <iframe
+            key={current.url}
+            src={current.url}
+            allowFullScreen
+            onError={handleError}
             style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              fontSize: 60,
-              color: "white",
-              zIndex: 10
-            }}
-          >
-            {playing ? "⏸" : "▶"}
-          </div>
-        )}
-
-        {/* BOTTOM CONTROLS */}
-        {showUI && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: 0,
               width: "100%",
-              padding: 10,
+              height: "100%",
+              border: "none",
+            }}
+          />
+        )}
+      </div>
+
+      {/* 🔥 SERVER BUTTONS */}
+      <div
+        style={{
+          marginTop: 15,
+          display: "flex",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        {servers.map((s, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(s)}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 6,
+              border: "none",
+              cursor: "pointer",
               background:
-                "linear-gradient(to top, rgba(0,0,0,0.8), transparent)"
+                current?.url === s.url ? "#e50914" : "#333",
+              color: "#fff",
             }}
           >
-            {/* PROGRESS BAR */}
-            <div
-              style={{
-                height: 5,
-                background: "#444",
-                borderRadius: 5
-              }}
-            >
-              <div
-                style={{
-                  width: `${progress}%`,
-                  height: "100%",
-                  background: "#ff0000"
-                }}
-              />
-            </div>
-          </div>
-        )}
+            {s.name}
+          </button>
+        ))}
       </div>
     </div>
   );
