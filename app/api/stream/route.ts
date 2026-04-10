@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSources } from "@/lib/providers";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -8,38 +9,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, sources: [] });
   }
 
-  try {
-    // 🔥 Extract ID from MyFlixBD URL (simple fallback)
-    const slug = url.split("/movie/")[1]?.replace("/", "");
+  const sources = await getSources(url);
 
-    // 🔥 Use reliable embed servers
-    const sources = [
-      {
-        name: "Server 1",
-        type: "iframe",
-        url: `https://vidsrc.to/embed/movie/${slug}`
-      },
-      {
-        name: "Server 2",
-        type: "iframe",
-        url: `https://vidsrc.me/embed/movie/${slug}`
-      },
-      {
-        name: "Server 3",
-        type: "iframe",
-        url: `https://vidsrc.net/embed/movie/${slug}`
-      }
-    ];
-
-    return NextResponse.json({
-      success: true,
-      sources
-    });
-
-  } catch (e) {
-    return NextResponse.json({
-      success: false,
-      sources: []
-    });
-  }
+  return NextResponse.json({
+    success: true,
+    sources
+  });
 }
