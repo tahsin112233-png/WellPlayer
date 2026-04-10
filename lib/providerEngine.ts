@@ -1,22 +1,29 @@
-import * as moviesdrive from "./providers/moviesdrive/posts";
+import { getMyFlix } from "@/lib/providers/myflixbd";
+import { getMoviesDrive } from "@/lib/providers/moviesdrive";
+import { getDirect } from "@/lib/providers/direct";
 
-import * as myflixPosts from "./providers/myflixbd/posts";
-import * as myflixMeta from "./providers/myflixbd/meta";
-import * as myflixStream from "./providers/myflixbd/stream";
-
-export const getProvider = (name: string) => {
-  switch (name) {
-    case "moviesdrive":
-      return moviesdrive;
-
-    case "myflixbd":
-      return {
-        ...myflixPosts,
-        getMeta: myflixMeta.getMeta,
-        getStream: myflixStream.getStream,
-      };
-
-    default:
-      throw new Error("Provider not found");
+export async function getStream(url: string) {
+  // 🔥 try MyFlixBD first
+  const myflix = await getMyFlix(url);
+  if (myflix.success && myflix.sources.length) {
+    return myflix;
   }
-};
+
+  // 🔥 fallback MoviesDrive
+  const movies = await getMoviesDrive(url);
+  if (movies.success && movies.sources.length) {
+    return movies;
+  }
+
+  // 🔥 fallback direct
+  const direct = getDirect(url);
+  if (direct.success) {
+    return direct;
+  }
+
+  return {
+    success: false,
+    sources: [],
+    debug: "No provider worked",
+  };
+}
