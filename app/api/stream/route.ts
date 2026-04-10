@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStream } from "@/lib/providerEngine";
+import { getProvider } from "@/lib/providerEngine";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -9,7 +9,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false });
   }
 
-  const data = await getStream(url);
+  try {
+    const data = await getProvider(url); // ✅ FIXED
 
-  return NextResponse.json(data);
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({
+      success: false,
+      error: err.message,
+    });
+  }
 }
