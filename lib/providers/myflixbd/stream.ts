@@ -1,23 +1,20 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
-// 🔥 resolve redirect (short.icu etc)
+// 🔥 resolve redirect
 async function resolveRedirect(url: string): Promise<string> {
   try {
     const res = await axios.get(url, {
       maxRedirects: 5,
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-      },
+      headers: { "User-Agent": "Mozilla/5.0" },
     });
-
     return res.request?.res?.responseUrl || url;
   } catch {
     return url;
   }
 }
 
-// 🔥 extract m3u8 / mp4
+// 🔥 extract m3u8/mp4
 function extractVideo(html: string): string | null {
   const m3u8 = html.match(/https?:\/\/[^"' ]+\.m3u8[^"' ]*/);
   if (m3u8) return m3u8[0];
@@ -28,76 +25,129 @@ function extractVideo(html: string): string | null {
   return null;
 }
 
-// 🔥 MAIN FUNCTION
+// 🔥 detect provider
+function detectProvider(url: string) {
+  if (url.includes("hubcloud")) return "hubcloud";
+  if (url.includes("filebee")) return "filebee";
+  if (url.includes("short.icu")) return "short";
+  return "unknown";
+}
+
+// 🔥 hubcloud extractor (basic)
+async function extractHubcloud(url: string) {
+  const res = await axios.get(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+
+  const html = res.data;
+  const video = extractVideo(html);
+
+  if (video) {
+    return {
+      type: "file",
+      url: video,
+    };
+  }
+
+  return null;
+}
+
+// 🔥 filebee extractor (basic)
+async function extractFilebee(url: string) {
+  const res = await axios.get(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+  });
+
+  const html = res.data;
+  const video = extractVideo(html);
+
+  if (video) {
+    return {
+      type: "file",
+      url: video,
+    };
+  }
+
+  return null;
+}
+
+// 🔥 MAIN
 export async function getStream(url: string) {
   try {
-    // STEP 1: load MyFlixBD page
     const res = await axios.get(url);
     const html = res.data;
-
     const $ = cheerio.load(html);
 
-    // STEP 2: get iframe
-    let iframe =
-      $("iframe").attr("data-src") ||
-      $("iframe").attr("src") ||
-      $(".btn-server").attr("data-url");
+    // 🔥 collect ALL servers
+    const servers: string[] = [];
 
-    if (!iframe) {
-      return {
-        success: false,
-      };
-    }
-
-    // STEP 3: resolve short link
-    const finalUrl = await resolveRedirect(iframe);
-
-    // STEP 4: fetch player page
-    const playerRes = await axios.get(finalUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": url,
-      },
+    $(".btn-server").each((_, el) => {
+      const s = $(el).attr("data-url");
+      if (s) servers.push(s);
     });
 
-    const playerHtml = playerRes.data;
-
-    // STEP 5: try direct video extraction
-    const video = extractVideo(playerHtml);
-
-    if (video) {
-      return {
-        success: true,
-        source: {
-          type: "file",
-          url: video,
-        },
-      };
-    }
-
-    // STEP 6: fallback → iframe inside iframe
-    const $$ = cheerio.load(playerHtml);
-    const nestedIframe = $$("iframe").attr("src");
-
-    if (nestedIframe) {
-      return {
-        success: true,
-        source: {
-          type: "iframe",
-          url: nestedIframe,
-        },
-      };
-    }
-
     // fallback
+    if (servers.length === 0) {
+      const iframe =
+        $("iframe").attr("data-src") ||
+        $("iframe").attr("src");
+      if (iframe) servers.push(iframe);
+    }
+
+    const sources = [];
+
+    // 🔥 process each server
+    for (let s of servers) {
+      let finalUrl = await resolveRedirect(s);
+
+      const provider = detectProvider(finalUrl);
+
+      let result: any = null;
+
+      if (provider === "hubcloud") {
+        result = await extractHubcloud(finalUrl);
+      } else if (provider === "filebee") {
+        result = await extractFilebee(finalUrl);
+      } else {
+        // generic fallback
+        const playerRes = await axios.get(finalUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0",
+            Referer: url,
+          },
+        });
+
+        const video = extractVideo(playerRes.data);
+
+        if (video) {
+          result = {
+            type: "file",
+            url: video,
+          };
+        } else {
+          const $$ = cheerio.load(playerRes.data);
+          const iframe = $$("iframe").attr("src");
+
+          result = {
+            type: "iframe",
+            url: iframe || finalUrl,
+          };
+        }
+      }
+
+      if (result) {
+        sources.push({
+          name: `Server ${sources.length + 1}`,
+          ...result,
+        });
+      }
+    }
+
     return {
       success: true,
-      source: {
-        type: "iframe",
-        url: finalUrl,
-      },
+      sources,
     };
-  } catch (err) {
+  } catch {
     return {
       success: false,
     };
