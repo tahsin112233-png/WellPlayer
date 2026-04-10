@@ -14,13 +14,13 @@ export default function WatchPage() {
 
   const [sources, setSources] = useState<Source[]>([]);
   const [current, setCurrent] = useState<Source | null>(null);
-  const [overlay, setOverlay] = useState("");
+  const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const target =
     "https://myflixbd.to/movie/avatar-fire-and-ash/";
 
-  // 🔥 Load API
+  // 🔥 Fetch sources
   useEffect(() => {
     async function load() {
       const res = await fetch(
@@ -49,7 +49,7 @@ export default function WatchPage() {
     load();
   }, []);
 
-  // 🔥 Setup player
+  // 🔥 Setup video
   useEffect(() => {
     if (!current || !videoRef.current) return;
 
@@ -68,109 +68,105 @@ export default function WatchPage() {
     }
   }, [current]);
 
-  // 🔥 DOUBLE TAP SEEK
-  let lastTap = 0;
-
-  const handleTap = (e: any) => {
-    const now = Date.now();
+  const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (now - lastTap < 300) {
-      const x = e.nativeEvent.offsetX;
-      const width = e.currentTarget.clientWidth;
-
-      if (x < width / 2) {
-        video.currentTime -= 10;
-        setOverlay("⏪ -10s");
-      } else {
-        video.currentTime += 10;
-        setOverlay("⏩ +10s");
-      }
-
-      setTimeout(() => setOverlay(""), 800);
-    }
-
-    lastTap = now;
-  };
-
-  // 🔥 SWIPE SEEK
-  let startX = 0;
-
-  const handleTouchStart = (e: any) => {
-    startX = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: any) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const endX = e.changedTouches[0].clientX;
-    const diff = endX - startX;
-
-    if (Math.abs(diff) > 50) {
-      video.currentTime += diff > 0 ? 10 : -10;
-      setOverlay(diff > 0 ? "⏩ +10s" : "⏪ -10s");
-
-      setTimeout(() => setOverlay(""), 800);
+    if (video.paused) {
+      video.play();
+      setPlaying(true);
+    } else {
+      video.pause();
+      setPlaying(false);
     }
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ background: "#000", minHeight: "100vh", padding: 10 }}>
       <h1 style={{ color: "white" }}>WellPlayer 🎬</h1>
 
+      {/* PLAYER */}
       <div
         style={{
           position: "relative",
-          background: "#000",
-          maxWidth: 800,
+          maxWidth: 900,
           margin: "auto",
+          background: "#000",
         }}
-        onClick={handleTap}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
         {loading ? (
           <p style={{ color: "white" }}>Loading...</p>
         ) : current?.type === "iframe" ? (
-          <iframe
-            src={current.url}
-            width="100%"
-            height="400"
-            allowFullScreen
-          />
+          <iframe src={current.url} width="100%" height="400" />
         ) : (
-          <video
-            ref={videoRef}
-            controls
-            autoPlay
-            playsInline
-            style={{ width: "100%" }}
-          />
-        )}
+          <>
+            <video
+              ref={videoRef}
+              playsInline
+              style={{ width: "100%" }}
+            />
 
-        {/* 🔥 Overlay UI */}
-        {overlay && (
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              color: "white",
-              fontSize: 24,
-              background: "rgba(0,0,0,0.6)",
-              padding: "10px 20px",
-              borderRadius: 10,
-            }}
-          >
-            {overlay}
-          </div>
+            {/* 🔥 CENTER PLAY BUTTON */}
+            <div
+              onClick={togglePlay}
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                fontSize: 60,
+                color: "white",
+                cursor: "pointer",
+              }}
+            >
+              {playing ? "⏸" : "▶"}
+            </div>
+
+            {/* 🔥 TOP GRADIENT */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                width: "100%",
+                height: 60,
+                background:
+                  "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
+              }}
+            />
+
+            {/* 🔥 BOTTOM CONTROLS */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 0,
+                width: "100%",
+                padding: 10,
+                background:
+                  "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <button
+                onClick={togglePlay}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "white",
+                  fontSize: 20,
+                }}
+              >
+                {playing ? "⏸" : "▶"}
+              </button>
+
+              <span style={{ color: "white" }}>WellPlayer</span>
+            </div>
+          </>
         )}
       </div>
 
-      {/* 🔥 SERVERS */}
+      {/* SERVERS */}
       <div style={{ marginTop: 20 }}>
         {sources.map((s, i) => (
           <button
