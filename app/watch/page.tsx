@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Hls from "hls.js";
+import Plyr from "plyr-react";
+import "plyr-react/plyr.css";
 
 type Source = {
   name: string;
@@ -10,156 +12,80 @@ type Source = {
 };
 
 export default function WatchPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   const [sources, setSources] = useState<Source[]>([]);
   const [current, setCurrent] = useState<Source | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   const target =
     "https://myflixbd.to/movie/avatar-fire-and-ash/";
 
-  // 🔥 FETCH SOURCES
   useEffect(() => {
     async function load() {
-      try {
-        const res = await fetch(
-          `/api/stream?url=${encodeURIComponent(target)}`
-        );
-        const data = await res.json();
+      const res = await fetch(
+        `/api/stream?url=${encodeURIComponent(target)}`
+      );
+      const data = await res.json();
 
-        if (data.success && data.sources.length > 0) {
-          setSources(data.sources);
+      if (data.success) {
+        setSources(data.sources);
 
-          const best =
-            data.sources.find((s: Source) =>
-              s.url.includes(".m3u8")
-            ) ||
-            data.sources.find((s: Source) =>
-              s.url.includes(".mp4")
-            ) ||
-            data.sources[0];
+        const best =
+          data.sources.find((s: Source) =>
+            s.url.includes(".m3u8")
+          ) ||
+          data.sources.find((s: Source) =>
+            s.url.includes(".mp4")
+          ) ||
+          data.sources[0];
 
-          setCurrent(best);
-        }
-      } catch (e) {
-        console.error("Fetch error", e);
+        setCurrent(best);
       }
-
-      setLoading(false);
     }
 
     load();
   }, []);
 
-  // 🔥 SET VIDEO SOURCE
-  useEffect(() => {
-    if (!current || !videoRef.current) return;
-
-    const video = videoRef.current;
-
-    video.pause();
-    video.removeAttribute("src");
-
-    if (current.url.includes(".m3u8")) {
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(current.url);
-        hls.attachMedia(video);
-      } else {
-        video.src = current.url;
-      }
-    } else {
-      video.src = current.url;
-    }
-
-    video.load();
-    setPlaying(false);
-  }, [current]);
-
-  // 🔥 PLAY / PAUSE
-  const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.paused) {
-      video.play();
-      setPlaying(true);
-    } else {
-      video.pause();
-      setPlaying(false);
-    }
+  const videoSource = {
+    type: "video",
+    sources: current
+      ? [
+          {
+            src: current.url,
+            type: current.url.includes(".m3u8")
+              ? "application/x-mpegURL"
+              : "video/mp4",
+          },
+        ]
+      : [],
   };
 
   return (
     <div style={{ background: "#000", minHeight: "100vh", padding: 10 }}>
       <h1 style={{ color: "white" }}>WellPlayer 🎬</h1>
 
-      {/* PLAYER */}
-      <div
-        style={{
-          position: "relative",
-          maxWidth: 900,
-          margin: "auto",
-          background: "#000",
-        }}
-      >
-        {loading ? (
-          <p style={{ color: "white" }}>Loading...</p>
-        ) : current?.type === "iframe" ? (
-          <iframe
-            src={current.url}
-            width="100%"
-            height="400"
-            allowFullScreen
+      <div style={{ maxWidth: 900, margin: "auto" }}>
+        {current && current.type === "file" && (
+          <Plyr
+            source={videoSource}
+            options={{
+              controls: [
+                "play",
+                "progress",
+                "current-time",
+                "mute",
+                "volume",
+                "settings",
+                "fullscreen"
+              ]
+            }}
           />
-        ) : (
-          <div style={{ position: "relative" }}>
-            {/* 🔥 VIDEO (NO NATIVE CONTROL) */}
-            <video
-              ref={videoRef}
-              playsInline
-              autoPlay
-              muted
-              style={{
-                width: "100%",
-                background: "black",
-                pointerEvents: "none"
-              }}
-            />
+        )}
 
-            {/* 🔥 CLICK LAYER */}
-            <div
-              onClick={togglePlay}
-              style={{
-                position: "absolute",
-                inset: 0,
-                zIndex: 5,
-                cursor: "pointer"
-              }}
-            />
-
-            {/* ▶ CENTER BUTTON */}
-            <div
-              onClick={togglePlay}
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                fontSize: 60,
-                color: "white",
-                zIndex: 10
-              }}
-            >
-              {playing ? "⏸" : "▶"}
-            </div>
-          </div>
+        {current && current.type === "iframe" && (
+          <iframe src={current.url} width="100%" height="400" />
         )}
       </div>
 
-      {/* 🔥 SERVERS */}
+      {/* SERVERS */}
       <div style={{ marginTop: 20 }}>
         {sources.map((s, i) => (
           <button
