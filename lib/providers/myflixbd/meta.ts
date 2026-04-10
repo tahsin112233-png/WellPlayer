@@ -12,9 +12,22 @@ export const getMeta = async (url: string): Promise<Info> => {
 
     const $ = cheerio.load(data);
 
-    const title = $(".heading-name").text().trim();
-    const image = $(".film-poster img").attr("src") || "";
-    const synopsis = $(".description").text().trim();
+    // Try multiple selectors (fallback system)
+    const title =
+      $("h1").first().text().trim() ||
+      $(".film-name").text().trim() ||
+      "";
+
+    const image =
+      $(".film-poster img").attr("src") ||
+      $(".film-poster img").attr("data-src") ||
+      $("img").first().attr("src") ||
+      "";
+
+    const synopsis =
+      $(".description").text().trim() ||
+      $(".film-description").text().trim() ||
+      $("p").text().trim();
 
     return {
       title,
