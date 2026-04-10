@@ -1,27 +1,58 @@
 import axios from "axios";
 
 export async function getMyFlix(url: string) {
-  try {
-    const res = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-      },
-    });
+  const sources: any[] = [];
 
+  try {
+    const headers = {
+      "User-Agent": "Mozilla/5.0",
+      Accept: "*/*",
+      Referer: "https://myflixbd.to/",
+    };
+
+    const res = await axios.get(url, { headers });
     const html = res.data;
 
-    const match = html.match(/https?:\/\/short\.icu\/[^\s"'<>]+/);
+    // 🔥 extract iframe (basic but working)
+    const match = html.match(/<iframe.*?src="(.*?)"/);
 
-    if (!match) return [];
+    if (!match) {
+      return { success: false, sources: [], debug: "iframe not found" };
+    }
 
-    return [
-      {
-        type: "iframe",
-        url: match[0],
-        name: "MyFlixBD",
-      },
-    ];
-  } catch {
-    return [];
+    let iframeUrl = match[1];
+
+    // fix relative
+    if (iframeUrl.startsWith("//")) {
+      iframeUrl = "https:" + iframeUrl;
+    }
+
+    // 🔥 resolve shortlink
+    let finalUrl = iframeUrl;
+
+    if (iframeUrl.includes("short.icu")) {
+      const redirect = await axios.get(iframeUrl, {
+        headers,
+        maxRedirects: 0,
+        validateStatus: (s) => s >= 200 && s < 400,
+      });
+
+      const location = redirect.headers.location;
+      if (location) finalUrl = location;
+    }
+
+    sources.push({
+      type: "iframe",
+      url: finalUrl,
+      name: "MyFlixBD",
+    });
+
+    return { success: true, sources };
+  } catch (e: any) {
+    return {
+      success: false,
+      sources: [],
+      debug: e.message,
+    };
   }
 }
