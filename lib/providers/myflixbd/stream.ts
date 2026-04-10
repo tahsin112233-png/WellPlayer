@@ -11,31 +11,21 @@ export const getStream = async (url: string): Promise<Stream[]> => {
 
     const streams: Stream[] = [];
 
-    // 🔥 Extract m3u8/mp4 from raw HTML
-    const m3u8Match = data.match(/https?:\/\/[^"]+\.m3u8/g);
-    const mp4Match = data.match(/https?:\/\/[^"]+\.mp4/g);
+    // 🔥 Extract all possible video links
+    const m3u8Matches = data.match(/https?:\/\/[^"]+\.m3u8/g) || [];
+    const mp4Matches = data.match(/https?:\/\/[^"]+\.mp4/g) || [];
 
-    if (m3u8Match) {
-      m3u8Match.forEach((link: string) => {
-        streams.push({
-          server: "MyFlixBD",
-          link,
-          type: "m3u8",
-        });
-      });
-    }
+    const allLinks = [...m3u8Matches, ...mp4Matches];
 
-    if (mp4Match) {
-      mp4Match.forEach((link: string) => {
-        streams.push({
-          server: "MyFlixBD",
-          link,
-          type: "mp4",
-        });
-      });
-    }
+    // 🔥 Remove duplicates
+    const uniqueLinks = Array.from(new Set(allLinks));
 
-    return streams;
+    // 🔥 Format response
+    return uniqueLinks.map((link) => ({
+      server: "MyFlixBD",
+      link,
+      type: link.includes(".m3u8") ? "m3u8" : "mp4",
+    }));
   } catch (err) {
     console.error("STREAM ERROR:", err);
     return [];
