@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { getStream } from "@/lib/providers/myflixbd/stream";
+import { getMoviesDrive } from "@/lib/providers/moviesdrive";
+import { getMyFlix } from "@/lib/providers/myflixbd";
+import { getDirect } from "@/lib/providers/direct";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -9,7 +11,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, sources: [] });
   }
 
-  const data = await getStream(url);
+  let sources: any[] = [];
 
-  return NextResponse.json(data);
+  // 🔥 TRY MOVIESDRIVE FIRST
+  const md = await getMoviesDrive(url);
+  if (md.length) sources.push(...md);
+
+  // 🔥 FALLBACK → MYFLIX
+  const mf = await getMyFlix(url);
+  if (mf.length) sources.push(...mf);
+
+  // 🔥 FINAL FALLBACK
+  const direct = await getDirect();
+  sources.push(...direct);
+
+  return NextResponse.json({
+    success: true,
+    sources,
+  });
 }
