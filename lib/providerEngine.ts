@@ -1,49 +1,45 @@
-import { getMyFlix } from "@/lib/providers/myflixbd";
-import { getMoviesDrive } from "@/lib/providers/moviesdrive";
-import { getDirect } from "@/lib/providers/direct";
+// lib/providerEngine.ts
 
-export type Source = {
-  type: "file" | "iframe";
-  url: string;
-  name: string;
-};
+import { StreamResponse, Source } from "./types";
 
-export type StreamResponse = {
-  success: boolean;
-  sources: Source[];
-  debug?: string;
-};
+// 🔌 PROVIDERS
+import { getMoviesDrive } from "./providers/moviesdrive";
+import { getMyFlixBD } from "./providers/myflixbd/stream";
+import { getDirect } from "./providers/direct";
 
-export async function getStream(url: string): Promise<StreamResponse> {
+// 🧹 SANITIZE (FIXED)
+function sanitizeSources(sources: any[]): Source[] {
+  return sources
+    .filter((s) => s?.url)
+    .map((s) => ({
+      type: s.type === "file" ? "file" : "iframe", // 🔥 FORCE VALID TYPE
+      url: s.url,
+      name: s.name || "Source",
+    }));
+}
+
+// 🧠 MAIN ENGINE
+export async function getProvider(url: string): Promise<StreamResponse> {
   const logs: string[] = [];
 
-  // ❌ invalid url protection
-  if (!url || url.startsWith("about:")) {
-    return {
-      success: false,
-      sources: [],
-      debug: "Invalid URL",
-    };
-  }
-
-  // 🔥 PROVIDER 1 — MYFLIXBD
   try {
-    const myflix = await getMyFlix(url);
-    if (myflix.success && myflix.sources.length > 0) {
-      return {
-        success: true,
-        sources: sanitizeSources(myflix.sources),
-      };
-    } else {
-      logs.push("MyFlixBD failed");
+    // 🔥 1. MYFLIXBD (PRIMARY)
+    if (url.includes("myflixbd")) {
+      const myflix = await getMyFlixBD(url);
+
+      if (myflix.success && myflix.sources.length > 0) {
+        return {
+          success: true,
+          sources: sanitizeSources(myflix.sources),
+        };
+      } else {
+        logs.push("MyFlixBD failed");
+      }
     }
-  } catch (e: any) {
-    logs.push("MyFlixBD error: " + e.message);
-  }
 
-  // 🔥 PROVIDER 2 — MOVIESDRIVE
-  try {
+    // 🔥 2. MOVIESDRIVE (FALLBACK)
     const movies = await getMoviesDrive(url);
+
     if (movies.success && movies.sources.length > 0) {
       return {
         success: true,
@@ -52,13 +48,10 @@ export async function getStream(url: string): Promise<StreamResponse> {
     } else {
       logs.push("MoviesDrive failed");
     }
-  } catch (e: any) {
-    logs.push("MoviesDrive error: " + e.message);
-  }
 
-  // 🔥 PROVIDER 3 — DIRECT LINK
-  try {
-    const direct = getDirect(url);
+    // 🔥 3. DIRECT EXTRACT (LAST RESORT)
+    const direct = await getDirect(url);
+
     if (direct.success && direct.sources.length > 0) {
       return {
         success: true,
@@ -67,35 +60,16 @@ export async function getStream(url: string): Promise<StreamResponse> {
     } else {
       logs.push("Direct failed");
     }
-  } catch (e: any) {
-    logs.push("Direct error: " + e.message);
+
+    // ❌ NOTHING WORKED
+    return {
+      success: false,
+      sources: [],
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      sources: [],
+    };
   }
-
-  // ❌ ALL FAILED
-  return {
-    success: false,
-    sources: [],
-    debug: logs.join(" | "),
-  };
 }
-
-// 🔥 CLEAN & VALIDATE SOURCES
-function sanitizeSources(sources: Source[]): Source[] {
-  return sources.filter((s) => {
-    if (!s.url) return false;
-
-    // ❌ block broken urls
-    if (
-      s.url.startsWith("about:") ||
-      s.url.includes("javascript:") ||
-      s.url === "#"
-    ) {
-      return false;
-    }
-
-    return true;
-  });
-}
-
-// 🔥 OPTIONAL ALIAS (for old code compatibility)
-export const getProvider = getStream;
