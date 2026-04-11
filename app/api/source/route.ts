@@ -17,24 +17,26 @@ export async function GET(req: Request) {
 
     const html = await res.text();
 
-    // Find iframe
-    const iframeMatch = html.match(/<iframe[^>]+src="([^"]+)"/);
+    // 🔥 get ALL iframes
+    const matches = [...html.matchAll(/<iframe[^>]+src="([^"]+)"/g)];
 
-    if (!iframeMatch) {
+    if (!matches.length) {
       return NextResponse.json({ error: "No iframe found" });
     }
 
-    let iframe = iframeMatch[1];
-
-    if (!iframe.startsWith("http")) {
-      iframe = new URL(iframe, target).href;
-    }
-
-    return NextResponse.json({
-      source: iframe,
+    const sources = matches.map(m => {
+      let link = m[1];
+      if (!link.startsWith("http")) {
+        link = new URL(link, target).href;
+      }
+      return link;
     });
 
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to fetch" });
+    return NextResponse.json({
+      sources, // multiple servers
+    });
+
+  } catch {
+    return NextResponse.json({ error: "Failed" });
   }
 }
