@@ -1,26 +1,22 @@
 import { getMoviesDrive } from "./providers/moviesdrive";
-import { Source } from "./types";
-
-function sanitize(sources: any[]): Source[] {
-  return sources.map((s, i) => ({
-    type: s.type === "file" ? "file" : "iframe",
-    url: s.url,
-    name: s.name || `Server ${i + 1}`,
-  }));
-}
 
 export async function getProvider(url: string) {
-  const result = await getMoviesDrive(url);
+  try {
+    const res = await getMoviesDrive(url);
 
-  if (result.success && result.sources.length) {
+    if (res.success && res.sources.length > 0) {
+      return res;
+    }
+
     return {
-      success: true,
-      sources: sanitize(result.sources),
+      success: false,
+      sources: [],
+    };
+  } catch (e: any) {
+    return {
+      success: false,
+      error: e.message,
+      sources: [],
     };
   }
-
-  return {
-    success: false,
-    sources: [],
-  };
 }
