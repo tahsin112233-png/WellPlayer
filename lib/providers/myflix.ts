@@ -9,12 +9,19 @@ export async function getMyflixPosts() {
 
     const html = await res.text();
 
-    const posts = [...html.matchAll(/<a href="(https:\/\/myflixbd\.to\/movie\/[^"]+)".*?<img src="([^"]+)".*?alt="([^"]+)"/gs)]
-      .map(match => ({
+    const regex = /<a href="(https:\/\/myflixbd\.to\/movie\/[^"]+)".*?<img src="([^"]+)".*?alt="([^"]+)"/gs;
+
+    const posts = [];
+    let match;
+
+    // ✅ SAFE LOOP (no matchAll spread)
+    while ((match = regex.exec(html)) !== null) {
+      posts.push({
         title: match[3],
         image: match[2],
         link: match[1],
-      }));
+      });
+    }
 
     return posts.slice(0, 20);
   } catch (e) {
