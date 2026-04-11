@@ -1,14 +1,12 @@
 export async function getMovieLinkBD() {
   try {
     const res = await fetch("https://movielinkbd.li", {
-      cache: "no-store",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
     });
 
     const html = await res.text();
-
-    // basic scraping (you can refine later)
-    const regex =
-      /<a href="(https:\/\/movielinkbd\.li\/[^"]+)"[^>]*>\s*<img src="([^"]+)"[^>]*>\s*<h2[^>]*>([^<]+)<\/h2>/g;
 
     const posts: {
       title: string;
@@ -16,19 +14,25 @@ export async function getMovieLinkBD() {
       link: string;
     }[] = [];
 
-    let match;
+    const items = html.split("<article");
 
-    while ((match = regex.exec(html)) !== null) {
-      posts.push({
-        link: match[1],
-        image: match[2],
-        title: match[3].trim(),
-      });
+    for (let item of items) {
+      const linkMatch = item.match(/href="(https:\/\/movielinkbd\.li\/[^"]+)"/);
+      const imgMatch = item.match(/src="([^"]+)"/);
+      const titleMatch = item.match(/alt="([^"]+)"/);
+
+      if (linkMatch && imgMatch && titleMatch) {
+        posts.push({
+          link: linkMatch[1],
+          image: imgMatch[1],
+          title: titleMatch[1],
+        });
+      }
     }
 
-    return posts.slice(0, 20); // limit
-  } catch (err) {
-    console.error("MovieLinkBD fetch error:", err);
+    return posts;
+  } catch (e) {
+    console.error("MovieLinkBD fetch error:", e);
     return [];
   }
 }
