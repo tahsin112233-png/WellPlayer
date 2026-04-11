@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -15,7 +17,6 @@ export default function WatchPage() {
 
     const load = async () => {
       try {
-        // Step 1: get iframe
         const res1 = await fetch(`/api/source?url=${encodeURIComponent(url)}`);
         const data1 = await res1.json();
 
@@ -24,14 +25,14 @@ export default function WatchPage() {
           return;
         }
 
-        // Step 2: get real stream
-        const res2 = await fetch(`/api/stream?iframe=${encodeURIComponent(data1.source)}`);
+        const res2 = await fetch(
+          `/api/stream?iframe=${encodeURIComponent(data1.source)}`
+        );
         const data2 = await res2.json();
 
         if (data2.stream) {
           setStream(data2.stream);
         }
-
       } catch (err) {
         console.error(err);
       }
