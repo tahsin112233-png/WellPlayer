@@ -1,38 +1,10 @@
-"use client";
+import { Suspense } from "react";
+import WatchClient from "./watch-client";
 
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-
-export default function WatchPage() {
-  const params = useSearchParams();
-  const url = params.get("url");
-
-  const [iframe, setIframe] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!url) return;
-
-    fetch(`/api/source?url=${encodeURIComponent(url)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.iframe) {
-          setIframe(data.iframe);
-        }
-      });
-  }, [url]);
-
+export default function Page() {
   return (
-    <div className="w-full h-screen bg-black flex items-center justify-center">
-      {iframe ? (
-        <iframe
-          src={iframe}
-          className="w-full h-full"
-          allow="autoplay; fullscreen"
-          allowFullScreen
-        />
-      ) : (
-        <p className="text-white">Loading...</p>
-      )}
-    </div>
+    <Suspense fallback={<div className="text-white">Loading player...</div>}>
+      <WatchClient />
+    </Suspense>
   );
 }
