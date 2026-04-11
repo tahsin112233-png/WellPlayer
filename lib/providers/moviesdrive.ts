@@ -1,37 +1,42 @@
 import axios from "axios";
+import * as cheerio from "cheerio";
 
-export type Source = {
-  type: "file" | "iframe";
-  url: string;
-  name: string;
-};
-
-export type StreamResponse = {
-  success: boolean;
-  sources: Source[];
-};
-
-export async function getMoviesDrive(url: string): Promise<StreamResponse> {
+export async function getMoviesDrive(url: string) {
   try {
-    // 🔥 your extraction logic here
-    // (for now dummy fallback)
+    const { data } = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+    });
 
-    const sources: Source[] = [];
+    const $ = cheerio.load(data);
+    const sources: any[] = [];
 
-    // Example (replace later with real extractor)
-    if (url.includes("moviesdrive")) {
-      sources.push({
-        type: "iframe",
-        url: url,
-        name: "MoviesDrive Embed",
-      });
-    }
+    let count = 1;
+
+    $("a").each((_, el) => {
+      const href = $(el).attr("href");
+      if (!href) return;
+
+      if (
+        href.includes("hubcloud") ||
+        href.includes("drive") ||
+        href.includes("player") ||
+        href.includes("embed")
+      ) {
+        sources.push({
+          type: "iframe",
+          url: href,
+          name: `Server ${count++}`,
+        });
+      }
+    });
 
     return {
-      success: sources.length > 0,
+      success: true,
       sources,
     };
-  } catch (err) {
+  } catch {
     return {
       success: false,
       sources: [],
