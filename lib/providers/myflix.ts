@@ -4,12 +4,10 @@ export async function getMyflixPosts() {
       headers: {
         "User-Agent": "Mozilla/5.0",
       },
-      cache: "no-store",
     });
 
     const html = await res.text();
 
-    // ✅ NO "s" FLAG — SAFE FOR VERCEL
     const regex = /<a href="(https:\/\/myflixbd\.to\/movie\/[^"]+)"[\s\S]*?<img src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
 
     const posts = [];
@@ -26,6 +24,14 @@ export async function getMyflixPosts() {
     return posts.slice(0, 20);
   } catch (e) {
     console.log("Myflix failed", e);
-    return [];
+
+    // 🔥 VERY IMPORTANT FALLBACK
+    return [
+      {
+        title: "Fallback Movie",
+        link: "https://myflixbd.to",
+        image: "https://via.placeholder.com/300x450",
+      },
+    ];
   }
 }
