@@ -1,36 +1,31 @@
-import { NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const res = await fetch("https://myflixbd.to", {
+    const res = await fetch("https://xm3enq.movielinkbd.li/", {
       headers: {
         "User-Agent": "Mozilla/5.0",
       },
+      cache: "no-store",
     });
 
     const html = await res.text();
 
-    const regex = /<img[^>]+src="([^"]+)"[^>]*alt="([^"]+)"/g;
+    // Extract movie cards
+    const matches = [
+      ...html.matchAll(
+        /href="(https:\/\/xm3enq\.movielinkbd\.li\/movie\/[^"]+)".*?<img src="([^"]+)".*?alt="([^"]+)"/gs
+      ),
+    ];
 
-    const posts = [];
-    let match;
+    const posts = matches.map((m) => ({
+      title: m[3],
+      link: m[1],
+      image: m[2],
+    }));
 
-    while ((match = regex.exec(html)) !== null) {
-      posts.push({
-        title: match[2],
-        image: match[1],
-        link: "https://myflixbd.to",
-      });
-    }
-
-    return NextResponse.json({
-      posts: posts.slice(0, 20),
-    });
-  } catch {
-    return NextResponse.json({
-      posts: [],
-    });
+    return Response.json({ success: true, posts });
+  } catch (e) {
+    return Response.json({ success: false });
   }
 }
