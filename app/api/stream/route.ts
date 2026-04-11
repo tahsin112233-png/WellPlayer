@@ -1,24 +1,46 @@
 import { NextResponse } from "next/server";
-import { getProvider } from "@/lib/providerEngine";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const url = searchParams.get("url");
+  const iframe = searchParams.get("iframe");
 
-  if (!url) {
-    return NextResponse.json({
-      success: false,
-      error: "No URL",
-    });
+  if (!iframe) {
+    return NextResponse.json({ error: "No iframe" });
   }
 
   try {
-    const data = await getProvider(url);
-    return NextResponse.json(data);
-  } catch (err: any) {
-    return NextResponse.json({
-      success: false,
-      error: err.message,
+    const res = await fetch(iframe, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": iframe,
+      },
     });
+
+    const html = await res.text();
+
+    // Try m3u8
+    const m3u8 = html.match(/https?:\/\/[^"]+\.m3u8/);
+
+    if (m3u8) {
+      return NextResponse.json({
+        stream: m3u8[0],
+        type: "hls",
+      });
+    }
+
+    // Try mp4
+    const mp4 = html.match(/https?:\/\/[^"]+\.mp4/);
+
+    if (mp4) {
+      return NextResponse.json({
+        stream: mp4[0],
+        type: "mp4",
+      });
+    }
+
+    return NextResponse.json({ error: "No stream found" });
+
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to extract" });
   }
 }
