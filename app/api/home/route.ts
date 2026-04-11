@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    // 🔗 Source homepage
     const res = await fetch("https://xm3enq.movielinkbd.li/", {
       headers: {
         "User-Agent":
@@ -13,26 +12,23 @@ export async function GET() {
 
     const html = await res.text();
 
-    // ✅ REGEX (movie cards)
+    // ✅ FIXED REGEX (removed 's' flag)
     const regex =
-      /href="(https:\/\/xm3enq\.movielinkbd\.li\/movie\/[^"]+)".*?<img[^>]+src="([^"]+)".*?alt="([^"]+)"/gs;
+      /href="(https:\/\/xm3enq\.movielinkbd\.li\/movie\/[^"]+)"[\s\S]*?<img[^>]+src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
 
     const matches: RegExpExecArray[] = [];
     let match;
 
-    // ✅ SAFE LOOP (no matchAll)
     while ((match = regex.exec(html)) !== null) {
       matches.push(match);
     }
 
-    // 🎬 FORMAT DATA
     const posts = matches.map((m) => ({
       title: cleanText(m[3]),
       link: m[1],
       image: m[2],
     }));
 
-    // 🔥 Remove duplicates (important)
     const uniquePosts = Array.from(
       new Map(posts.map((p) => [p.link, p])).values()
     );
@@ -40,7 +36,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       count: uniquePosts.length,
-      data: uniquePosts.slice(0, 20), // limit (adjust if needed)
+      data: uniquePosts.slice(0, 20),
     });
   } catch (err: any) {
     return NextResponse.json({
@@ -50,7 +46,6 @@ export async function GET() {
   }
 }
 
-// 🧹 CLEAN TEXT (remove weird chars)
 function cleanText(text: string) {
   return text
     .replace(/&#\d+;/g, "")
