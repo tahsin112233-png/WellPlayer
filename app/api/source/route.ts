@@ -17,26 +17,31 @@ export async function GET(req: Request) {
 
     const html = await res.text();
 
-    // 🔥 get ALL iframes
-    const matches = [...html.matchAll(/<iframe[^>]+src="([^"]+)"/g)];
+    const sources: string[] = [];
 
-    if (!matches.length) {
-      return NextResponse.json({ error: "No iframe found" });
-    }
+    // ✅ SAFE REGEX LOOP (NO matchAll)
+    const regex = /<iframe[^>]+src="([^"]+)"/g;
+    let match;
 
-    const sources = matches.map(m => {
-      let link = m[1];
+    while ((match = regex.exec(html)) !== null) {
+      let link = match[1];
+
       if (!link.startsWith("http")) {
         link = new URL(link, target).href;
       }
-      return link;
-    });
+
+      sources.push(link);
+    }
+
+    if (sources.length === 0) {
+      return NextResponse.json({ error: "No iframe found" });
+    }
 
     return NextResponse.json({
-      sources, // multiple servers
+      sources,
     });
 
-  } catch {
-    return NextResponse.json({ error: "Failed" });
+  } catch (err) {
+    return NextResponse.json({ error: "Failed to fetch" });
   }
 }
