@@ -11,33 +11,51 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { data } = await axios.get(url);
+    const { data } = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      },
+    });
+
     const $ = cheerio.load(data);
 
     const sources: any[] = [];
 
+    // 🔥 extract all server links
     $("a").each((_, el) => {
-      const text = $(el).text();
-      const href = $(el).attr("href");
+      const link = $(el).attr("href");
 
       if (
-        href &&
-        (text.includes("1080") ||
-          text.includes("720") ||
-          text.includes("480"))
+        link &&
+        (link.includes("hubcloud") ||
+          link.includes("pixeldrain") ||
+          link.includes("stream") ||
+          link.includes("drive"))
       ) {
         sources.push({
-          quality: text,
-          url: href,
+          type: "iframe",
+          url: link,
+          name: "Server",
         });
       }
     });
 
-    return NextResponse.json({ success: true, sources });
-  } catch (e: any) {
+    // ✅ remove duplicates
+    const unique = Array.from(
+      new Map(sources.map((s) => [s.url, s])).values()
+    );
+
+    return NextResponse.json({
+      success: true,
+      sources: unique,
+    });
+  } catch (e) {
+    console.log("SOURCE ERROR:", e);
+
     return NextResponse.json({
       success: false,
-      error: e.message,
+      sources: [],
     });
   }
 }
