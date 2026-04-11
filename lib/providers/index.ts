@@ -1,17 +1,12 @@
-export async function getSources(url: string) {
-  const sources = [];
+import { getMyflixPosts } from "./myflix";
 
-  // 🔥 Provider 1 (iframe safe fallback)
-  const slug = url.split("/movie/")[1]?.replace("/", "");
+export async function getAllContent() {
+  const myflix = await getMyflixPosts();
 
-  sources.push({
-    name: "Server 1",
-    type: "iframe",
-    url: `https://vidsrc.to/embed/movie/${slug}`
-  });
-
-  // 🔥 Placeholder for future real extractor
-  // sources.push(await hubcloudExtractor(url));
-
-  return sources;
+  return [
+    ...myflix,
+    // later add:
+    // ...vegamovies
+    // ...moviesdrive
+  ];
 }
