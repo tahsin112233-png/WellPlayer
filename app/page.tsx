@@ -1,77 +1,113 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPosts } from "@/lib/api";
-import { searchMovie } from "@/lib/tmdb";
-import Row from "@/components/Row";
-import PlayerModal from "@/components/PlayerModal";
 
 export default function Home() {
-  const [movies, setMovies] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
-  const [hero, setHero] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
 
   useEffect(() => {
-    getPosts().then(async (res) => {
-      if (res.success) {
-        setMovies(res.posts);
-
-        const random = res.posts[0];
-        const tmdb = await searchMovie(random.title);
-
-        if (tmdb) setHero(tmdb);
-      }
-    });
+    fetch("/api/posts")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setPosts(data.posts);
+        }
+      });
   }, []);
 
   return (
-    <div style={{ background: "black", minHeight: "100vh" }}>
-      
-      {/* 🎬 HERO */}
-      {hero && (
+    <div style={{ background: "#000", color: "#fff", minHeight: "100vh" }}>
+      {/* HEADER */}
+      <h1 style={{ padding: 20, fontSize: 28 }}>WellPlayer 🎬</h1>
+
+      {/* HERO (OPTIONAL) */}
+      {posts.length > 0 && (
         <div
           style={{
-            height: 400,
-            backgroundImage: `url(https://image.tmdb.org/t/p/original${hero.backdrop_path})`,
-            backgroundSize: "cover",
             position: "relative",
+            height: 300,
+            marginBottom: 20,
           }}
         >
-          <div
+          <img
+            src={posts[0].image}
+            alt={posts[0].title}
             style={{
-              position: "absolute",
-              inset: 0,
-              background: "linear-gradient(to top, black, transparent)",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              opacity: 0.6,
             }}
           />
 
-          <div style={{ position: "absolute", bottom: 20, left: 20 }}>
-            <h1 style={{ color: "white", fontSize: 30 }}>
-              {hero.title}
-            </h1>
-            <p style={{ color: "gray", maxWidth: 400 }}>
-              {hero.overview}
-            </p>
+          <div
+            style={{
+              position: "absolute",
+              bottom: 20,
+              left: 20,
+            }}
+          >
+            <h2 style={{ fontSize: 28 }}>{posts[0].title}</h2>
+
+            <a
+              href={`/watch?url=${encodeURIComponent(posts[0].link)}`}
+              style={{
+                display: "inline-block",
+                marginTop: 10,
+                padding: "10px 20px",
+                background: "#e50914",
+                color: "#fff",
+                borderRadius: 6,
+                textDecoration: "none",
+              }}
+            >
+              ▶ Play
+            </a>
           </div>
         </div>
       )}
 
-      {/* 🎞️ ROW */}
-      <div style={{ padding: 20 }}>
-        <Row
-          title="Trending"
-          movies={movies}
-          onClick={(m: any) => setSelected(m)}
-        />
-      </div>
+      {/* TRENDING */}
+      <h2 style={{ padding: "0 20px" }}>Trending</h2>
 
-      {/* 🎥 PLAYER */}
-      {selected && (
-        <PlayerModal
-          movie={selected}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: 15,
+          padding: 20,
+        }}
+      >
+        {posts.map((movie, i) => (
+          <a
+            key={i}
+            href={`/watch?url=${encodeURIComponent(movie.link)}`}
+            style={{ textDecoration: "none", color: "#fff" }}
+          >
+            <div>
+              <img
+                src={movie.image}
+                alt={movie.title}
+                style={{
+                  width: "100%",
+                  borderRadius: 10,
+                  height: 220,
+                  objectFit: "cover",
+                }}
+              />
+
+              <h3
+                style={{
+                  fontSize: 14,
+                  marginTop: 8,
+                }}
+              >
+                {movie.title}
+              </h3>
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
