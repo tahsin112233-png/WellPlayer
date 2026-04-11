@@ -1,16 +1,12 @@
-import { getMoviesDrive } from "./providers/moviesdrive";
+import { getMovieLinkBD } from "./providers/movielinkbd";
 
-export async function getProvider(url: string) {
+export async function getProvider() {
   try {
-    const res = await getMoviesDrive(url);
-
-    if (res.success && res.sources.length > 0) {
-      return res;
-    }
+    const data = await getMovieLinkBD();
 
     return {
-      success: false,
-      sources: [],
+      success: true,
+      sources: data,
     };
   } catch (e: any) {
     return {
