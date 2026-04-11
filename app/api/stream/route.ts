@@ -6,9 +6,19 @@ export async function GET(req: Request) {
   const url = searchParams.get("url");
 
   if (!url) {
-    return NextResponse.json({ success: false });
+    return NextResponse.json({
+      success: false,
+      error: "No URL",
+    });
   }
 
-  const data = await getProvider(url);
-  return NextResponse.json(data);
+  try {
+    const data = await getProvider(url);
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({
+      success: false,
+      error: err.message,
+    });
+  }
 }
