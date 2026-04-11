@@ -16,13 +16,14 @@ export async function getMoviesDrive(url: string) {
 
     $("a").each((_, el) => {
       const href = $(el).attr("href");
+
       if (!href) return;
 
       if (
         href.includes("hubcloud") ||
+        href.includes("gdflix") ||
         href.includes("drive") ||
-        href.includes("player") ||
-        href.includes("embed")
+        href.includes("player")
       ) {
         sources.push({
           type: "iframe",
