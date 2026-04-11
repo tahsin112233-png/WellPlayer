@@ -1,46 +1,37 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function WatchPage() {
-  const [src, setSrc] = useState("");
-  const [type, setType] = useState("");
+  const params = useSearchParams();
+  const url = params.get("url");
+
+  const [iframe, setIframe] = useState<string | null>(null);
 
   useEffect(() => {
-    const url = new URL(window.location.href).searchParams.get("url");
-
     if (!url) return;
 
-    fetch(`/api/stream?url=${encodeURIComponent(url)}`)
+    fetch(`/api/source?url=${encodeURIComponent(url)}`)
       .then(res => res.json())
       .then(data => {
-        if (data.source) {
-          setSrc(data.source);
-          setType(data.type);
+        if (data.iframe) {
+          setIframe(data.iframe);
         }
       });
-  }, []);
-
-  if (!src) return <p style={{ color: "white" }}>Loading...</p>;
+  }, [url]);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1 style={{ color: "white" }}>WellPlayer 🎬</h1>
-
-      {type === "iframe" ? (
+    <div className="w-full h-screen bg-black flex items-center justify-center">
+      {iframe ? (
         <iframe
-          src={src}
-          width="100%"
-          height="500"
+          src={iframe}
+          className="w-full h-full"
+          allow="autoplay; fullscreen"
           allowFullScreen
         />
       ) : (
-        <video
-          src={src}
-          controls
-          autoPlay
-          style={{ width: "100%" }}
-        />
+        <p className="text-white">Loading...</p>
       )}
     </div>
   );
