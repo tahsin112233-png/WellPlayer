@@ -8,34 +8,48 @@ export async function GET(req: Request) {
     const url = searchParams.get("url");
 
     if (!url) {
-      return NextResponse.json({ error: "No URL provided" });
+      return NextResponse.json({ error: "No URL" });
     }
 
     const res = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0",
       },
+      cache: "no-store",
     });
 
     const html = await res.text();
 
-    // ✅ Extract iframe ONLY (ignore promo video)
-    const iframeMatch = html.match(/<iframe[^>]+src="([^"]+)"/i);
+    // STEP 1: get ALL iframes
+    const iframeMatches = html.match(/<iframe[^>]+src="([^"]+)"/g) || [];
 
-    if (!iframeMatch) {
-      return NextResponse.json({ error: "No iframe found" });
+    let realIframe = null;
+
+    for (const tag of iframeMatches) {
+      const srcMatch = tag.match(/src="([^"]+)"/);
+      const src = srcMatch?.[1];
+
+      if (!src) continue;
+
+      // ❌ skip promo/tutorial
+      if (
+        src.includes("upload") ||
+        src.includes(".mp4") ||
+        src.includes("download")
+      ) {
+        continue;
+      }
+
+      // ✅ pick real embed
+      realIframe = src;
+      break;
     }
 
-    let iframeUrl = iframeMatch[1];
-
-    // Fix protocol
-    if (iframeUrl.startsWith("//")) {
-      iframeUrl = "https:" + iframeUrl;
+    if (!realIframe) {
+      return NextResponse.json({ error: "No real iframe found" });
     }
 
-    return NextResponse.json({
-      iframe: iframeUrl,
-    });
+    return NextResponse.json({ iframe: realIframe });
 
   } catch (err) {
     return NextResponse.json({ error: "Failed to fetch source" });
