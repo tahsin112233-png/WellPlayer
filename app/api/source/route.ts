@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -18,7 +20,6 @@ export async function GET(req: Request) {
       },
     });
 
-    // 🔥 FIX: no matchAll (vercel issue)
     const regex = /<iframe[^>]+src="([^"]+)"/g;
 
     const sources: any[] = [];
@@ -35,12 +36,6 @@ export async function GET(req: Request) {
       });
     }
 
-    if (!sources.length) {
-      return NextResponse.json({
-        error: "No iframe found",
-      });
-    }
-
     return NextResponse.json({
       success: true,
       sources,
@@ -48,7 +43,7 @@ export async function GET(req: Request) {
   } catch (err) {
     console.log("SOURCE ERROR:", err);
     return NextResponse.json({
-      error: "Failed to extract source",
+      error: "Failed to extract",
     });
   }
 }
