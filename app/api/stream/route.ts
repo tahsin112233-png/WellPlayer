@@ -2,65 +2,46 @@ import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const iframe = searchParams.get("iframe");
+  const target = searchParams.get("url");
 
-  if (!iframe) {
-    return NextResponse.json({ error: "No iframe" });
+  if (!target) {
+    return NextResponse.json({ error: "No URL" });
   }
 
   try {
-    const res = await fetch(iframe, {
+    const res = await fetch(target, {
       headers: {
         "User-Agent": "Mozilla/5.0",
-        "Referer": iframe,
       },
     });
 
     const html = await res.text();
 
-    // 🔥 1. m3u8 (best case)
-    const m3u8 = html.match(/https?:\/\/[^"' ]+\.m3u8[^"' ]*/);
-    if (m3u8) {
-      return NextResponse.json({
-        stream: m3u8[0],
-        type: "hls",
-      });
+    // 🔥 FIXED: no matchAll
+    const regex = /<iframe[^>]+src="([^"]+)"/g;
+    const sources: string[] = [];
+
+    let match;
+
+    while ((match = regex.exec(html)) !== null) {
+      let link = match[1];
+
+      if (!link.startsWith("http")) {
+        link = new URL(link, target).href;
+      }
+
+      sources.push(link);
     }
 
-    // 🔥 2. mp4 fallback
-    const mp4 = html.match(/https?:\/\/[^"' ]+\.mp4[^"' ]*/);
-    if (mp4) {
-      return NextResponse.json({
-        stream: mp4[0],
-        type: "mp4",
-      });
+    if (!sources.length) {
+      return NextResponse.json({ error: "No iframe found" });
     }
 
-    // 🔥 3. file:"..." pattern (common in players)
-    const fileMatch = html.match(/file:\s*["']([^"']+)["']/);
-    if (fileMatch) {
-      return NextResponse.json({
-        stream: fileMatch[1],
-        type: "hls",
-      });
-    }
-
-    // 🔥 4. source src="..."
-    const sourceMatch = html.match(/<source[^>]+src=["']([^"']+)["']/);
-    if (sourceMatch) {
-      return NextResponse.json({
-        stream: sourceMatch[1],
-        type: "mp4",
-      });
-    }
-
-    // ❌ nothing found
     return NextResponse.json({
-      error: "No stream found",
-      debug: html.slice(0, 500), // helps debugging
+      sources,
     });
 
   } catch (err) {
-    return NextResponse.json({ error: "Failed to extract" });
+    return NextResponse.json({ error: "Failed" });
   }
 }
