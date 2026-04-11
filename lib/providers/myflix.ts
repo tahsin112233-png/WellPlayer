@@ -9,12 +9,12 @@ export async function getMyflixPosts() {
 
     const html = await res.text();
 
-    const regex = /<a href="(https:\/\/myflixbd\.to\/movie\/[^"]+)".*?<img src="([^"]+)".*?alt="([^"]+)"/gs;
+    // ✅ NO "s" FLAG — SAFE FOR VERCEL
+    const regex = /<a href="(https:\/\/myflixbd\.to\/movie\/[^"]+)"[\s\S]*?<img src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
 
     const posts = [];
     let match;
 
-    // ✅ SAFE LOOP (no matchAll spread)
     while ((match = regex.exec(html)) !== null) {
       posts.push({
         title: match[3],
