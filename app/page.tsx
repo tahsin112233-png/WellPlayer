@@ -2,17 +2,29 @@
 
 import { useEffect, useState } from "react";
 
+type Movie = {
+  title: string;
+  link: string;
+  image: string;
+};
+
 export default function Home() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/posts")
+    fetch("/api/home")
       .then((res) => res.json())
       .then((data) => {
-        if (data.success) {
+        console.log("HOME DATA:", data);
+
+        if (data.success && data.posts?.length) {
           setPosts(data.posts);
         }
-      });
+
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   return (
@@ -20,8 +32,13 @@ export default function Home() {
       {/* HEADER */}
       <h1 style={{ padding: 20, fontSize: 28 }}>WellPlayer 🎬</h1>
 
-      {/* HERO (OPTIONAL) */}
-      {posts.length > 0 && (
+      {/* LOADING */}
+      {loading && (
+        <p style={{ padding: 20, color: "gray" }}>Loading content...</p>
+      )}
+
+      {/* HERO BANNER */}
+      {!loading && posts.length > 0 && (
         <div
           style={{
             position: "relative",
@@ -47,7 +64,7 @@ export default function Home() {
               left: 20,
             }}
           >
-            <h2 style={{ fontSize: 28 }}>{posts[0].title}</h2>
+            <h2 style={{ fontSize: 26 }}>{posts[0].title}</h2>
 
             <a
               href={`/watch?url=${encodeURIComponent(posts[0].link)}`}
@@ -67,47 +84,61 @@ export default function Home() {
         </div>
       )}
 
-      {/* TRENDING */}
-      <h2 style={{ padding: "0 20px" }}>Trending</h2>
+      {/* GRID */}
+      {!loading && posts.length > 0 && (
+        <>
+          <h2 style={{ padding: "0 20px" }}>Latest</h2>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: 15,
-          padding: 20,
-        }}
-      >
-        {posts.map((movie, i) => (
-          <a
-            key={i}
-            href={`/watch?url=${encodeURIComponent(movie.link)}`}
-            style={{ textDecoration: "none", color: "#fff" }}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: 15,
+              padding: 20,
+            }}
           >
-            <div>
-              <img
-                src={movie.image}
-                alt={movie.title}
+            {posts.map((movie, i) => (
+              <a
+                key={i}
+                href={`/watch?url=${encodeURIComponent(movie.link)}`}
                 style={{
-                  width: "100%",
-                  borderRadius: 10,
-                  height: 220,
-                  objectFit: "cover",
-                }}
-              />
-
-              <h3
-                style={{
-                  fontSize: 14,
-                  marginTop: 8,
+                  textDecoration: "none",
+                  color: "#fff",
                 }}
               >
-                {movie.title}
-              </h3>
-            </div>
-          </a>
-        ))}
-      </div>
+                <div>
+                  <img
+                    src={movie.image}
+                    alt={movie.title}
+                    style={{
+                      width: "100%",
+                      height: 220,
+                      objectFit: "cover",
+                      borderRadius: 10,
+                    }}
+                  />
+
+                  <h3
+                    style={{
+                      fontSize: 14,
+                      marginTop: 8,
+                    }}
+                  >
+                    {movie.title}
+                  </h3>
+                </div>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* EMPTY STATE */}
+      {!loading && posts.length === 0 && (
+        <p style={{ padding: 20, color: "gray" }}>
+          No content found (MyFlix blocked or changed structure)
+        </p>
+      )}
     </div>
   );
 }
