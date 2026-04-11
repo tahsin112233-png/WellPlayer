@@ -1,46 +1,59 @@
-import { NextRequest, NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const url = req.nextUrl.searchParams.get("url");
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const movieUrl = searchParams.get("url");
 
-  if (!url) {
-    return NextResponse.json({ error: "No URL" }, { status: 400 });
+  if (!movieUrl) {
+    return Response.json({ error: "No URL" });
   }
 
   try {
-    // Step 1: fetch watch page
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
+    // STEP 1: open movie page
+    const movieRes = await fetch(movieUrl, {
+      headers: { "User-Agent": "Mozilla/5.0" },
       cache: "no-store",
     });
 
-    const html = await res.text();
+    const movieHtml = await movieRes.text();
 
-    // Step 2: extract play.movielinkbd.mom link
-    const match = html.match(
+    // STEP 2: extract WATCH link
+    const watchMatch = movieHtml.match(
+      /href="(https:\/\/xm3enq\.movielinkbd\.li\/watch\/[^"]+)"/
+    );
+
+    if (!watchMatch) {
+      return Response.json({ error: "No watch link" });
+    }
+
+    const watchUrl = watchMatch[1];
+
+    // STEP 3: open watch page
+    const watchRes = await fetch(watchUrl, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      cache: "no-store",
+    });
+
+    const watchHtml = await watchRes.text();
+
+    // STEP 4: extract REAL STREAM
+    const streamMatch = watchHtml.match(
       /https:\/\/play\.movielinkbd\.mom\/watch\/[^\s"'<>]+/
     );
 
-    if (!match) {
-      return NextResponse.json({ error: "No stream found" });
+    if (!streamMatch) {
+      return Response.json({ error: "No stream found" });
     }
 
-    const streamUrl = match[0];
-
-    return NextResponse.json({
+    return Response.json({
       sources: [
         {
-          url: streamUrl,
+          url: streamMatch[0],
           type: "mp4",
         },
       ],
     });
   } catch (err) {
-    return NextResponse.json({ error: "Failed" });
+    return Response.json({ error: "Failed" });
   }
 }
