@@ -12,23 +12,46 @@ export async function GET() {
 
     const html = await res.text();
 
-    // ✅ FIXED REGEX (removed 's' flag)
+    // ✅ STEP 1: find ALL movie links
     const regex =
-      /href="(https:\/\/xm3enq\.movielinkbd\.li\/movie\/[^"]+)"[\s\S]*?<img[^>]+src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
+      /href="(https:\/\/xm3enq\.movielinkbd\.li\/movie\/[^"]+)"/g;
 
-    const matches: RegExpExecArray[] = [];
+    const matches: { link: string; index: number }[] = [];
     let match;
 
     while ((match = regex.exec(html)) !== null) {
-      matches.push(match);
+      matches.push({
+        link: match[1],
+        index: match.index,
+      });
     }
 
-    const posts = matches.map((m) => ({
-      title: cleanText(m[3]),
-      link: m[1],
-      image: m[2],
-    }));
+    // ❌ If still nothing → site is JS-rendered
+    if (matches.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: "No matches found (likely JS-rendered site)",
+        debug: html.slice(0, 500), // helps debug
+      });
+    }
 
+    // ✅ STEP 2: extract title + image near each link
+    const posts = matches.map((m) => {
+      const slice = html.substring(m.index, m.index + 800);
+
+      const titleMatch = slice.match(/alt="([^"]+)"/i);
+      const imgMatch = slice.match(
+        /src="([^"]+\.(jpg|jpeg|png|webp))"/i
+      );
+
+      return {
+        title: titleMatch ? cleanText(titleMatch[1]) : "No title",
+        link: m.link,
+        image: imgMatch ? imgMatch[1] : "",
+      };
+    });
+
+    // ✅ STEP 3: remove duplicates
     const uniquePosts = Array.from(
       new Map(posts.map((p) => [p.link, p])).values()
     );
@@ -46,6 +69,7 @@ export async function GET() {
   }
 }
 
+// 🧹 CLEAN TEXT
 function cleanText(text: string) {
   return text
     .replace(/&#\d+;/g, "")
