@@ -18,9 +18,8 @@ export async function GET(req: Request) {
 
     const html = await res.text();
 
-    // Try m3u8
-    const m3u8 = html.match(/https?:\/\/[^"]+\.m3u8/);
-
+    // 🔥 1. m3u8 (best case)
+    const m3u8 = html.match(/https?:\/\/[^"' ]+\.m3u8[^"' ]*/);
     if (m3u8) {
       return NextResponse.json({
         stream: m3u8[0],
@@ -28,9 +27,8 @@ export async function GET(req: Request) {
       });
     }
 
-    // Try mp4
-    const mp4 = html.match(/https?:\/\/[^"]+\.mp4/);
-
+    // 🔥 2. mp4 fallback
+    const mp4 = html.match(/https?:\/\/[^"' ]+\.mp4[^"' ]*/);
     if (mp4) {
       return NextResponse.json({
         stream: mp4[0],
@@ -38,7 +36,29 @@ export async function GET(req: Request) {
       });
     }
 
-    return NextResponse.json({ error: "No stream found" });
+    // 🔥 3. file:"..." pattern (common in players)
+    const fileMatch = html.match(/file:\s*["']([^"']+)["']/);
+    if (fileMatch) {
+      return NextResponse.json({
+        stream: fileMatch[1],
+        type: "hls",
+      });
+    }
+
+    // 🔥 4. source src="..."
+    const sourceMatch = html.match(/<source[^>]+src=["']([^"']+)["']/);
+    if (sourceMatch) {
+      return NextResponse.json({
+        stream: sourceMatch[1],
+        type: "mp4",
+      });
+    }
+
+    // ❌ nothing found
+    return NextResponse.json({
+      error: "No stream found",
+      debug: html.slice(0, 500), // helps debugging
+    });
 
   } catch (err) {
     return NextResponse.json({ error: "Failed to extract" });
