@@ -3,154 +3,138 @@
 import { useEffect, useRef, useState } from "react";
 
 type Source = {
-  type: "file" | "iframe";
+  type: "iframe" | "file";
   url: string;
   name: string;
 };
 
 export default function WatchPage() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   const [sources, setSources] = useState<Source[]>([]);
   const [current, setCurrent] = useState<Source | null>(null);
-  const [mode, setMode] = useState<"iframe" | "video">("video");
   const [loading, setLoading] = useState(true);
 
-  const target =
-    "https://myflixbd.to/movie/avatar-fire-and-ash/";
+  const params =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search)
+      : null;
 
-  // 🚀 FETCH STREAM
+  const target = params?.get("url");
+
+  // FETCH SOURCES
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(
-          `/api/stream?url=${encodeURIComponent(target)}`
-        );
-        const data = await res.json();
+    if (!target) return;
 
-        if (data.success && data.sources?.length) {
-          setSources(data.sources);
-        } else {
-          throw new Error("No valid sources");
-        }
-      } catch (err) {
-        console.log("FALLBACK ACTIVATED");
-
-        // 🔥 ALWAYS HAVE BACKUP
-        setSources([
-          {
-            type: "file",
-            url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-            name: "Fallback Stream",
-          },
-        ]);
-      } finally {
+    fetch(`/api/stream?url=${encodeURIComponent(target)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSources(data.sources || []);
+        setCurrent(data.sources?.[0] || null);
         setLoading(false);
-      }
-    }
-
-    load();
-  }, []);
-
-  // 🎯 AUTO SELECT
-  useEffect(() => {
-    if (!sources.length) return;
-
-    const iframe = sources.find((s) => s.type === "iframe");
-    const file = sources.find((s) => s.type === "file");
-
-    if (iframe && iframe.url !== "about:blank") {
-      setCurrent(iframe);
-      setMode("iframe");
-    } else if (file) {
-      setCurrent(file);
-      setMode("video");
-    }
-  }, [sources]);
-
-  // 🎬 VIDEO LOADER
-  useEffect(() => {
-    if (!videoRef.current || !current || mode !== "video") return;
-
-    const video = videoRef.current;
-
-    if (current.url.includes(".m3u8")) {
-      import("hls.js").then((Hls) => {
-        if (Hls.default.isSupported()) {
-          const hls = new Hls.default();
-          hls.loadSource(current.url);
-          hls.attachMedia(video);
-        }
       });
-    } else {
-      video.src = current.url;
+  }, [target]);
+
+  // AUTO RETRY
+  useEffect(() => {
+    if (!current && sources.length > 1) {
+      setCurrent(sources[1]);
     }
-  }, [current, mode]);
+  }, [current]);
 
   return (
-    <div style={{ padding: 20, background: "black", minHeight: "100vh" }}>
-      <h1 style={{ color: "white" }}>WellPlayer 🎬</h1>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "black",
+        color: "white",
+        padding: 10,
+      }}
+    >
+      <h2 style={{ opacity: 0.7 }}>WellPlayer 🎬</h2>
 
-      {/* 🔄 LOADING */}
-      {loading && (
-        <p style={{ color: "gray" }}>Loading streams...</p>
-      )}
+      {/* PLAYER */}
+      <div
+        style={{
+          width: "100%",
+          height: 220,
+          background: "#111",
+          borderRadius: 12,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        {loading && <p>Loading...</p>}
 
-      {/* ❌ NO SOURCE */}
-      {!loading && !current && (
-        <p style={{ color: "red" }}>No playable source found</p>
-      )}
+        {current && current.type === "iframe" && (
+          <iframe
+            src={current.url}
+            style={{ width: "100%", height: "100%", border: "none" }}
+            allowFullScreen
+          />
+        )}
 
-      {/* 🎬 IFRAME */}
-      {current && mode === "iframe" && current.url !== "about:blank" && (
-        <iframe
-          src={current.url}
+        {/* 10s skip overlay (UI only) */}
+        <div
           style={{
-            width: "100%",
-            height: 220,
-            border: "none",
-            borderRadius: 12,
+            position: "absolute",
+            top: "40%",
+            left: 10,
+            fontSize: 12,
+            opacity: 0.5,
           }}
-          allowFullScreen
-        />
-      )}
+        >
+          ⏪ 10s
+        </div>
 
-      {/* 🎥 VIDEO */}
-      {current && mode === "video" && (
-        <video
-          ref={videoRef}
-          controls
-          autoPlay
+        <div
           style={{
-            width: "100%",
-            borderRadius: 12,
-            background: "black",
+            position: "absolute",
+            top: "40%",
+            right: 10,
+            fontSize: 12,
+            opacity: 0.5,
           }}
-        />
-      )}
+        >
+          10s ⏩
+        </div>
+      </div>
 
-      {/* 🔁 SERVERS */}
+      {/* SERVERS */}
       <div style={{ marginTop: 20 }}>
         {sources.map((s, i) => (
           <button
             key={i}
-            onClick={() => {
-              if (!s.url || s.url === "about:blank") return;
-
-              setCurrent(s);
-              setMode(s.type === "iframe" ? "iframe" : "video");
-            }}
+            onClick={() => setCurrent(s)}
             style={{
               marginRight: 10,
-              padding: "10px 15px",
-              background: "#ff4444",
+              marginBottom: 10,
+              padding: "8px 12px",
+              background:
+                current?.url === s.url ? "#e50914" : "#222",
               color: "white",
               border: "none",
               borderRadius: 6,
-              opacity: s.url === "about:blank" ? 0.5 : 1,
             }}
           >
-            {s.name || `Server ${i + 1}`}
+            {s.name}
+          </button>
+        ))}
+      </div>
+
+      {/* QUALITY UI (mock for now) */}
+      <div style={{ marginTop: 10 }}>
+        {["1080p", "720p", "480p"].map((q) => (
+          <button
+            key={q}
+            style={{
+              marginRight: 10,
+              padding: "6px 10px",
+              background: "#333",
+              borderRadius: 6,
+              color: "white",
+              border: "none",
+            }}
+          >
+            {q}
           </button>
         ))}
       </div>
